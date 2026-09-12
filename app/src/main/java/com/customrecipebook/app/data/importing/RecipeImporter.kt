@@ -4,10 +4,14 @@ import android.app.Application
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.util.Log
 import com.customrecipebook.app.data.ImportSource
 import com.customrecipebook.app.data.RecipeDraft
 import com.customrecipebook.app.domain.PdfStreamTextExtractor
 import com.customrecipebook.app.domain.RecipeTextParser
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
+import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.text.PDFTextStripper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -19,28 +23,17 @@ class RecipeImporter(private val app: Application) {
         val displayName = displayName(uri) ?: "recipe.pdf"
         val copied = copyToImports(uri, displayName)
         val bytes = copied.readBytes()
-        val extracted = runCatching { PdfStreamTextExtractor.extract(bytes) }.getOrDefault("")
+        val extracted = extractPdfText(bytes)
         val fallbackTitle = RecipeTextParser.titleFromFileName(displayName)
         val parsed = RecipeTextParser.parse(extracted, fallbackTitle)
-        val message = if (parsed.extracted) {
-            "Read the text layer from $displayName. Check quantities, then save."
-        } else {
-            "Couldn't read text from this PDF. The file is attached — add ingredients and steps below."
-        }
-        RecipeDraft(
-            title = parsed.title,
-            subtitle = parsed.subtitle,
-            source = ImportSource.PDF,
-            imageUri = null,
-            attachmentUri = copied.absolutePath,
-            attachmentName = displayName,
-            ingredients = parsed.ingredients,
-            directions = parsed.directions,
-            parseMessage = message,
-            titleConfidence = if (parsed.extracted) 80 else 40,
-            ingredientsConfidence = if (parsed.ingredients.isNotEmpty()) 70 else 0,
-            instructionsConfidence = if (parsed.directions.isNotEmpty()) 70 else 0,
+        val draft = RecipeTextParser.toDraft(parsed, displayName, copied.absolutePath)
+        Log.i(
+            TAG,
+            "PDF import file=$displayName bytes=${bytes.size} extractedChars=${extracted.length} " +
+                "ingredients=${draft.ingredients.size} directions=${draft.directions.size} " +
+                "extracted=${parsed.extracted}",
         )
+        draft
     }
 
     suspend fun importPhoto(uri: Uri): RecipeDraft = withContext(Dispatchers.IO) {
@@ -68,6 +61,31 @@ class RecipeImporter(private val app: Application) {
             ingredientsConfidence = 0,
             instructionsConfidence = 0,
         )
+    }
+
+    internal fun extractPdfText(bytes: ByteArray): String {
+        val custom = runCatching { PdfStreamTextExtractor.extract(bytes) }.getOrDefault("")
+        val pdfBox = extractWithPdfBox(bytes)
+        val chosen = when {
+            pdfBox.length > custom.length + 10 -> pdfBox
+            custom.isNotBlank() -> custom
+            else -> pdfBox
+        }
+        Log.i(TAG, "extract custom=${custom.length} pdfbox=${pdfBox.length} chosen=${chosen.length}")
+        return chosen
+    }
+
+    private fun extractWithPdfBox(bytes: ByteArray): String = try {
+        if (!pdfBoxReady) {
+            PDFBoxResourceLoader.init(app)
+            pdfBoxReady = true
+        }
+        PDDocument.load(bytes).use { document ->
+            PDFTextStripper().apply { sortByPosition = true }.getText(document).trim()
+        }
+    } catch (error: Exception) {
+        Log.w(TAG, "PDFBox extract failed: ${error.message}")
+        ""
     }
 
     private fun persistReadPermission(uri: Uri) {
@@ -106,5 +124,10 @@ class RecipeImporter(private val app: Application) {
         }
         if (dest.length() == 0L) error("The selected file was empty.")
         return dest
+    }
+
+    companion object {
+        private const val TAG = "RecipeImport"
+        @Volatile private var pdfBoxReady = false
     }
 }

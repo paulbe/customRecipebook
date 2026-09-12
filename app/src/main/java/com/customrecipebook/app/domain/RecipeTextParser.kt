@@ -1,6 +1,8 @@
 package com.customrecipebook.app.domain
 
 import com.customrecipebook.app.data.DraftIngredient
+import com.customrecipebook.app.data.ImportSource
+import com.customrecipebook.app.data.RecipeDraft
 
 data class ParsedRecipeText(
     val title: String,
@@ -8,29 +10,42 @@ data class ParsedRecipeText(
     val ingredients: List<DraftIngredient>,
     val directions: List<String>,
     val extracted: Boolean,
+    val sourceText: String = "",
 )
 
 object RecipeTextParser {
-    private val ingredientHeaders = setOf(
-        "ingredients", "ingredient", "you will need", "shopping list", "what you need",
+    private val ingredientHeaderWords = listOf(
+        "ingredients", "ingredient list", "ingredient", "you will need",
+        "shopping list", "what you need", "for the dough", "for the sauce",
+        "for the filling",
     )
-    private val directionHeaders = setOf(
+    private val directionHeaderWords = listOf(
         "directions", "direction", "instructions", "instruction",
         "method", "steps", "preparation", "prepare", "to make",
+        "how to make", "procedure",
     )
     private val units = listOf(
         "tablespoons", "tablespoon", "teaspoons", "teaspoon",
         "tbsp", "tsp", "cups", "cup", "ounces", "ounce", "oz",
         "pounds", "pound", "lbs", "lb", "grams", "gram", "kg", "g",
-        "milliliters", "millilitre", "ml", "liters", "litre", "l",
+        "milliliters", "millilitre", "ml", "liters", "litre",
         "cloves", "clove", "large", "medium", "small", "pinch", "dash",
+        "cans", "can", "sticks", "stick", "slices", "slice",
     )
     private val unitPattern = units.joinToString("|") { Regex.escape(it) }
     private val qtyPattern = Regex(
-        """^(?:(\d+\s+\d+/\d+|\d+/\d+|\d+(?:\.\d+)?|[¼½¾⅓⅔]))\s*(?:($unitPattern))?\b[:\s]*(.*)$""",
+        """^(?:(\d+\s+\d+/\d+|\d+/\d+|\d+(?:\.\d+)?|[¼½¾⅓⅔]))\s*(?:($unitPattern))?\b[:\s,]*(.*)$""",
         RegexOption.IGNORE_CASE,
     )
-    private val numbered = Regex("""^\d+[\.)]\s+(.*)$""")
+    private val numbered = Regex("""^\d+[\.)]\s*(.*)$""")
+    private val headerSplit = Regex(
+        """(?i)(?<=\S)\s*(?=\b(?:ingredients?|directions?|instructions?|method|steps|preparation)\b)""",
+    )
+    private val stepSplit = Regex("""(?<!\n)\s+(?=\d+[.)]\s+)""")
+    private val qtySplit = Regex(
+        """(?<!\n)\s+(?=[-•*]?\s*\d+(?:\s+\d+/\d+)?\s+(?:$unitPattern)\b)""",
+        RegexOption.IGNORE_CASE,
+    )
 
     fun titleFromFileName(name: String): String {
         val base = name.substringAfterLast('/')
@@ -45,15 +60,25 @@ object RecipeTextParser {
         }
     }
 
+    fun normalize(raw: String): String {
+        var text = raw.replace("\r\n", "\n").replace('\r', '\n')
+        text = text.replace(headerSplit, "\n")
+        text = text.replace(Regex("""(?i)\b(ingredients?|directions?|instructions?|method|steps|preparation)\s*:"""), "\n$1\n")
+        text = text.replace(stepSplit, "\n")
+        text = text.replace(qtySplit, "\n")
+        return text
+    }
+
     fun parse(raw: String, fallbackTitle: String): ParsedRecipeText {
-        val lines = raw.lines().map { it.trim() }.filter { it.isNotBlank() }
+        val normalized = normalize(raw)
+        val lines = normalized.lines().map { it.trim() }.filter { it.isNotBlank() }
         if (lines.isEmpty()) {
-            return ParsedRecipeText(fallbackTitle, "", emptyList(), emptyList(), extracted = false)
+            return ParsedRecipeText(fallbackTitle, "", emptyList(), emptyList(), extracted = false, sourceText = raw)
         }
 
         var title = fallbackTitle
         var start = 0
-        if (!looksLikeHeader(lines.first()) && lines.first().length in 3..80) {
+        if (headerKind(lines.first()) == null && lines.first().length in 3..80) {
             title = lines.first().trim()
             start = 1
         }
@@ -71,13 +96,17 @@ object RecipeTextParser {
             when (section) {
                 Section.INGREDIENTS -> ingredients += parseIngredientLine(line)
                 Section.DIRECTIONS -> directions += stripNumber(line)
-                Section.UNKNOWN -> {
-                    when {
-                        looksLikeIngredient(line) -> ingredients += parseIngredientLine(line)
-                        numbered.matches(line) -> directions += stripNumber(line)
-                    }
-                }
+                Section.UNKNOWN -> classifyUnknown(line, ingredients, directions)
             }
+        }
+
+        if (ingredients.isEmpty() && directions.isEmpty() && lines.size > start) {
+            for (line in lines.drop(start)) {
+                classifyUnknown(line, ingredients, directions)
+            }
+        }
+        if (ingredients.isEmpty() && directions.isEmpty() && lines.size > start) {
+            directions += lines.drop(start)
         }
 
         val extracted = ingredients.isNotEmpty() || directions.isNotEmpty()
@@ -93,11 +122,38 @@ object RecipeTextParser {
             ingredients = ingredients,
             directions = directions,
             extracted = extracted,
+            sourceText = raw.trim(),
+        )
+    }
+
+    fun toDraft(
+        parsed: ParsedRecipeText,
+        fileName: String,
+        attachmentPath: String?,
+    ): RecipeDraft {
+        val message = if (parsed.extracted) {
+            "Filled ${parsed.ingredients.size} ingredients and ${parsed.directions.size} steps from $fileName. Edit anything that looks off, then save."
+        } else {
+            "Couldn't read text from this PDF. The file is attached — add ingredients and steps below."
+        }
+        return RecipeDraft(
+            title = parsed.title,
+            subtitle = parsed.subtitle,
+            source = ImportSource.PDF,
+            imageUri = null,
+            attachmentUri = attachmentPath,
+            attachmentName = fileName,
+            ingredients = parsed.ingredients,
+            directions = parsed.directions,
+            parseMessage = message,
+            titleConfidence = if (parsed.extracted) 80 else 40,
+            ingredientsConfidence = if (parsed.ingredients.isNotEmpty()) 80 else 0,
+            instructionsConfidence = if (parsed.directions.isNotEmpty()) 80 else 0,
         )
     }
 
     fun parseIngredientLine(line: String): DraftIngredient {
-        val cleaned = line.replace(Regex("^[-•*]\\s*"), "")
+        val cleaned = line.replace(Regex("^[-•*–]\\s*"), "")
         val match = qtyPattern.find(cleaned)
         if (match != null) {
             val qty = parseAmount(match.groupValues[1])
@@ -120,23 +176,35 @@ object RecipeTextParser {
         )
     }
 
-    private fun looksLikeIngredient(line: String): Boolean =
-        qtyPattern.containsMatchIn(line.replace(Regex("^[-•*]\\s*"), ""))
-
-    private fun looksLikeHeader(line: String): Boolean =
-        headerKind(line) != null
-
-    private fun headerKind(line: String): Section? {
-        val key = line.lowercase().trimEnd(':').trim()
-        return when {
-            key in ingredientHeaders -> Section.INGREDIENTS
-            key in directionHeaders -> Section.DIRECTIONS
-            else -> null
+    private fun classifyUnknown(
+        line: String,
+        ingredients: MutableList<DraftIngredient>,
+        directions: MutableList<String>,
+    ) {
+        when {
+            looksLikeIngredient(line) -> ingredients += parseIngredientLine(line)
+            numbered.matches(line) -> directions += stripNumber(line)
+            line.startsWith("-") || line.startsWith("•") || line.startsWith("*") ->
+                ingredients += parseIngredientLine(line)
         }
     }
 
+    private fun looksLikeIngredient(line: String): Boolean =
+        qtyPattern.containsMatchIn(line.replace(Regex("^[-•*–]\\s*"), ""))
+
+    private fun headerKind(line: String): Section? {
+        val key = line.lowercase().trim().trimEnd(':').trim()
+        if (ingredientHeaderWords.any { key == it || key.startsWith("$it ") || key.startsWith("$it(") }) {
+            return Section.INGREDIENTS
+        }
+        if (directionHeaderWords.any { key == it || key.startsWith("$it ") || key.startsWith("$it(") }) {
+            return Section.DIRECTIONS
+        }
+        return null
+    }
+
     private fun stripNumber(line: String): String =
-        numbered.matchEntire(line)?.groupValues?.get(1) ?: line
+        numbered.matchEntire(line)?.groupValues?.get(1)?.takeIf { it.isNotBlank() } ?: line
 
     private fun parseAmount(raw: String): Double {
         val value = raw.trim()

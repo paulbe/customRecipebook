@@ -2,10 +2,12 @@ package com.customrecipebook.app.domain
 
 import java.io.ByteArrayOutputStream
 import java.util.zip.Inflater
+import kotlin.math.abs
 
 /**
  * Pulls a text layer out of a PDF by inflating content streams and reading
- * Tj / TJ string operators. Works for many recipe PDFs without a full parser.
+ * Tj / TJ / ' string operators. Inserts line breaks on Td/TD/T* so recipe
+ * headers stay on their own lines for the parser.
  */
 object PdfStreamTextExtractor {
     fun extract(bytes: ByteArray): String {
@@ -17,8 +19,7 @@ object PdfStreamTextExtractor {
         val pieces = mutableListOf<String>()
         var index = 0
         while (true) {
-            val streamAt = latin.indexOf("stream", index)
-            if (streamAt < 0) break
+            val streamAt = indexOfKeyword(latin, "stream", index) ?: break
             val afterKeyword = streamAt + 6
             var dataStart = afterKeyword
             if (dataStart < latin.length && latin[dataStart] == '\r') dataStart++
@@ -28,12 +29,37 @@ object PdfStreamTextExtractor {
             val raw = bytes.copyOfRange(dataStart, endAt)
             val dictStart = latin.lastIndexOf("<<", streamAt)
             val dict = if (dictStart >= 0) latin.substring(dictStart, streamAt) else ""
+            if (!looksLikeContentStream(dict)) {
+                index = endAt + 9
+                continue
+            }
             val payload = decodeStream(raw, dict)
-            val text = readTextOperators(payload)
+            val text = readTextOperators(insertLayoutBreaks(payload.toString(Charsets.ISO_8859_1)))
             if (text.isNotBlank()) pieces += text
             index = endAt + 9
         }
-        return pieces.joinToString("\n").trim()
+        return pieces.joinToString("\n")
+            .replace(Regex("[ \\t]{2,}"), " ")
+            .replace(Regex("\n{3,}"), "\n\n")
+            .trim()
+    }
+
+    private fun looksLikeContentStream(dict: String): Boolean {
+        if (dict.contains("/Subtype") && dict.contains("/Image")) return false
+        if (dict.contains("/Length")) return true
+        val type = Regex("""/Type\s*/(\w+)""").find(dict)?.groupValues?.get(1)
+        return type == null || type == "XObject"
+    }
+
+    private fun indexOfKeyword(src: String, word: String, from: Int): Int? {
+        var i = from
+        while (true) {
+            val at = src.indexOf(word, i)
+            if (at < 0) return null
+            val before = if (at == 0) ' ' else src[at - 1]
+            if (before != 'd' && !before.isLetterOrDigit()) return at
+            i = at + word.length
+        }
     }
 
     private fun decodeStream(raw: ByteArray, dict: String): ByteArray {
@@ -63,18 +89,45 @@ object PdfStreamTextExtractor {
         null
     }
 
-    internal fun readTextOperators(payload: ByteArray): String {
-        val src = payload.toString(Charsets.ISO_8859_1)
+    internal fun insertLayoutBreaks(src: String): String {
+        return src
+            .replace(Regex("""\bT\*"""), "\n")
+            .replace(Regex("""(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+T[dD]\b""")) { match ->
+                val ty = match.groupValues[2].toDoubleOrNull() ?: 0.0
+                if (abs(ty) > 1.0) "\n" else " "
+            }
+            .replace(Regex("""(?:-?\d+(?:\.\d+)?\s+){5}(-?\d+(?:\.\d+)?)\s+Tm\b""")) { "\n" }
+    }
+
+    internal fun readTextOperators(src: String): String {
         val out = StringBuilder()
         var i = 0
         while (i < src.length) {
             when (src[i]) {
+                '\n' -> {
+                    out.append('\n')
+                    i++
+                }
                 '(' -> {
                     val (text, next) = readLiteral(src, i)
                     i = next
                     val rest = src.substring(i).trimStart()
                     if (rest.startsWith("Tj") || rest.startsWith("'") || rest.startsWith("\"")) {
-                        out.append(text)
+                        if (rest.startsWith("'") || rest.startsWith("\"")) out.append('\n')
+                        appendToken(out, text)
+                    }
+                }
+                '<' -> {
+                    val end = src.indexOf('>', i)
+                    if (end > i) {
+                        val hex = decodeHex(src.substring(i + 1, end))
+                        val rest = src.substring(end + 1).trimStart()
+                        if (hex.isNotBlank() && (rest.startsWith("Tj") || rest.startsWith("'") || rest.startsWith("\""))) {
+                            appendToken(out, hex)
+                        }
+                        i = end + 1
+                    } else {
+                        i++
                     }
                 }
                 '[' -> {
@@ -82,7 +135,7 @@ object PdfStreamTextExtractor {
                     if (close > i) {
                         val after = src.substring(close + 1).trimStart()
                         if (after.startsWith("TJ")) {
-                            out.append(readTjArray(src.substring(i + 1, close)))
+                            appendToken(out, readTjArray(src.substring(i + 1, close)))
                         }
                         i = close + 1
                     } else {
@@ -92,10 +145,15 @@ object PdfStreamTextExtractor {
                 else -> i++
             }
         }
-        return out.toString()
-            .replace(Regex("(?<=\\S)(?=[A-Z][a-z])"), " ")
-            .replace(Regex("[ \\t]{2,}"), " ")
-            .trim()
+        return out.toString().trim()
+    }
+
+    private fun appendToken(out: StringBuilder, text: String) {
+        if (text.isEmpty()) return
+        if (out.isNotEmpty() && out.last() != '\n' && !out.last().isWhitespace() && !text.first().isWhitespace()) {
+            out.append(' ')
+        }
+        out.append(text)
     }
 
     private fun readTjArray(body: String): String {

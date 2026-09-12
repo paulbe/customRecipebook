@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.customrecipebook.app.data.RecipeDraft
 import com.customrecipebook.app.data.importing.RecipeImporter
 import com.customrecipebook.app.data.repo.RecipeRepository
+import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -23,6 +24,10 @@ class AddRecipeViewModel(
             _state.update { it.copy(isParsing = true, error = null) }
             runCatching { importer.importPdf(uri) }
                 .onSuccess { draft ->
+                    Log.i(
+                        "RecipeImport",
+                        "ViewModel draft title=${draft.title} ings=${draft.ingredients.size} steps=${draft.directions.size}",
+                    )
                     _state.update {
                         it.copy(
                             draft = draft,

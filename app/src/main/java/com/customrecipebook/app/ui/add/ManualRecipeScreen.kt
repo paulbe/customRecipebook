@@ -148,10 +148,13 @@ fun ManualRecipeScreen(
             Field("Servings label", draft.servingsUnit) { value -> vm.updateDraft { it.copy(servingsUnit = value) } }
             Field("Difficulty", draft.difficulty) { value -> vm.updateDraft { it.copy(difficulty = value) } }
 
-            SectionHeader("Ingredients") {
+            SectionHeader("Ingredients", count = draft.ingredients.size) {
                 vm.updateDraft { d ->
                     d.copy(ingredients = d.ingredients + DraftIngredient("", 1.0, "cup", 120.0, "g"))
                 }
+            }
+            if (draft.ingredients.isEmpty()) {
+                Text("No ingredients detected yet. Tap Add to enter them.", color = Taupe, fontSize = 13.sp)
             }
             draft.ingredients.forEachIndexed { index, item ->
                 IngredientEditor(item) { updated ->
@@ -161,8 +164,11 @@ fun ManualRecipeScreen(
                 }
             }
 
-            SectionHeader("Directions") {
+            SectionHeader("Directions", count = draft.directions.size) {
                 vm.updateDraft { d -> d.copy(directions = d.directions + "") }
+            }
+            if (draft.directions.isEmpty()) {
+                Text("No steps detected yet. Tap Add to write them.", color = Taupe, fontSize = 13.sp)
             }
             draft.directions.forEachIndexed { index, step ->
                 Field("Step ${index + 1}", step, singleLine = false) { value ->
@@ -190,7 +196,7 @@ fun ManualRecipeScreen(
 }
 
 @Composable
-private fun SectionHeader(title: String, onAdd: () -> Unit) {
+private fun SectionHeader(title: String, count: Int = 0, onAdd: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -198,7 +204,12 @@ private fun SectionHeader(title: String, onAdd: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(title, color = Espresso, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+        Text(
+            if (count > 0) "$title ($count)" else title,
+            color = Espresso,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 16.sp,
+        )
         Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(20.dp))
