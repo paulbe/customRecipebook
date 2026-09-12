@@ -28,6 +28,8 @@ data class RecipeEntity(
     val difficulty: String,
     val imageKey: String?,
     val imageUri: String?,
+    val attachmentUri: String?,
+    val attachmentName: String?,
     val isSaved: Boolean,
     val source: String,
     val createdAt: Long,
@@ -116,7 +118,7 @@ interface RecipeDao {
 
 @Database(
     entities = [RecipeEntity::class, IngredientEntity::class, DirectionEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -137,6 +139,8 @@ fun RecipeEntity.toModel(
     difficulty = difficulty,
     imageKey = imageKey,
     imageUri = imageUri,
+    attachmentUri = attachmentUri,
+    attachmentName = attachmentName,
     isSaved = isSaved,
     source = runCatching { ImportSource.valueOf(source) }.getOrDefault(ImportSource.MANUAL),
     createdAt = createdAt,
@@ -155,6 +159,8 @@ fun Recipe.toEntity(): RecipeEntity = RecipeEntity(
     difficulty = difficulty,
     imageKey = imageKey,
     imageUri = imageUri,
+    attachmentUri = attachmentUri,
+    attachmentName = attachmentName,
     isSaved = isSaved,
     source = source.name,
     createdAt = createdAt,

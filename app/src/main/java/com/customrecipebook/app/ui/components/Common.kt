@@ -10,9 +10,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BakeryDining
-import androidx.compose.material.icons.outlined.DinnerDining
 import androidx.compose.material.icons.outlined.LocalDining
-import androidx.compose.material.icons.outlined.RamenDining
+import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -25,7 +25,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.customrecipebook.app.R
+import com.customrecipebook.app.data.ImportSource
 import com.customrecipebook.app.data.Recipe
 import com.customrecipebook.app.data.RecipeCategory
 import com.customrecipebook.app.ui.theme.Clay
@@ -130,21 +130,14 @@ fun RecipeThumb(recipe: Recipe, modifier: Modifier = Modifier, size: Int = 56) {
     }
 }
 
-fun recipeThumbIcon(recipe: Recipe): ImageVector = when (recipe.imageKey) {
-    "cookies" -> Icons.Outlined.BakeryDining
-    "chicken" -> Icons.Outlined.DinnerDining
-    "pasta" -> Icons.Outlined.RamenDining
-    "bread", "muffins" -> Icons.Outlined.BakeryDining
+fun recipeThumbIcon(recipe: Recipe): ImageVector = when (recipe.source) {
+    ImportSource.PDF -> Icons.Outlined.PictureAsPdf
+    ImportSource.CAMERA -> Icons.Outlined.PhotoCamera
     else -> if (recipe.category == RecipeCategory.BAKING) {
         Icons.Outlined.BakeryDining
     } else {
         Icons.Outlined.LocalDining
     }
-}
-
-fun recipeImageRes(imageKey: String?): Int? = when (imageKey) {
-    "cookies" -> R.drawable.img_cookies
-    else -> null
 }
 
 @Composable

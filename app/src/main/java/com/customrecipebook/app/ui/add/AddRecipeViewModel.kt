@@ -1,35 +1,72 @@
 package com.customrecipebook.app.ui.add
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.customrecipebook.app.data.ImportSource
 import com.customrecipebook.app.data.RecipeDraft
+import com.customrecipebook.app.data.importing.RecipeImporter
 import com.customrecipebook.app.data.repo.RecipeRepository
-import com.customrecipebook.app.data.repo.SeedData
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class AddRecipeViewModel(private val repository: RecipeRepository) : ViewModel() {
+class AddRecipeViewModel(
+    private val repository: RecipeRepository,
+    private val importer: RecipeImporter,
+) : ViewModel() {
     private val _state = MutableStateFlow(AddRecipeUiState())
     val state: StateFlow<AddRecipeUiState> = _state
 
-    fun applyParsedImport(source: ImportSource, imageUri: String?) {
-        val stub = SeedData.creamyWhiteBeanSoup().copy(
-            source = source,
-            imageUri = imageUri,
-        )
-        _state.update {
-            it.copy(
-                draft = stub,
-                hasPreview = true,
-                parseLabel = when (source) {
-                    ImportSource.PDF -> "Parsed from your PDF"
-                    ImportSource.CAMERA -> "Read from your photo"
-                    else -> "Draft ready"
-                },
-            )
+    fun importPdf(uri: Uri, onReady: () -> Unit) {
+        viewModelScope.launch {
+            _state.update { it.copy(isParsing = true, error = null) }
+            runCatching { importer.importPdf(uri) }
+                .onSuccess { draft ->
+                    _state.update {
+                        it.copy(
+                            draft = draft,
+                            hasPreview = true,
+                            isParsing = false,
+                            parseLabel = draft.attachmentName ?: "PDF",
+                        )
+                    }
+                    onReady()
+                }
+                .onFailure { error ->
+                    _state.update {
+                        it.copy(
+                            isParsing = false,
+                            error = error.message ?: "Couldn't read that PDF.",
+                        )
+                    }
+                }
+        }
+    }
+
+    fun importPhoto(uri: Uri, onReady: () -> Unit) {
+        viewModelScope.launch {
+            _state.update { it.copy(isParsing = true, error = null) }
+            runCatching { importer.importPhoto(uri) }
+                .onSuccess { draft ->
+                    _state.update {
+                        it.copy(
+                            draft = draft,
+                            hasPreview = true,
+                            isParsing = false,
+                            parseLabel = draft.attachmentName ?: "Photo",
+                        )
+                    }
+                    onReady()
+                }
+                .onFailure { error ->
+                    _state.update {
+                        it.copy(
+                            isParsing = false,
+                            error = error.message ?: "Couldn't use that photo.",
+                        )
+                    }
+                }
         }
     }
 
@@ -61,6 +98,7 @@ class AddRecipeViewModel(private val repository: RecipeRepository) : ViewModel()
 data class AddRecipeUiState(
     val draft: RecipeDraft = RecipeDraft(),
     val hasPreview: Boolean = false,
+    val isParsing: Boolean = false,
     val parseLabel: String = "",
     val error: String? = null,
 )

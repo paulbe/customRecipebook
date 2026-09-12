@@ -21,7 +21,8 @@ class HomeViewModel(repository: RecipeRepository) : ViewModel() {
         HomeUiState(
             recipes = repository.filter(recipes, selected),
             selectedCategory = selected,
-            isEmptyLibrary = recipes.isEmpty(),
+            totalCount = recipes.size,
+            loaded = true,
         )
     }.stateIn(
         viewModelScope,
@@ -37,5 +38,6 @@ class HomeViewModel(repository: RecipeRepository) : ViewModel() {
 data class HomeUiState(
     val recipes: List<Recipe> = emptyList(),
     val selectedCategory: RecipeCategory = RecipeCategory.ALL,
-    val isEmptyLibrary: Boolean = false,
+    val totalCount: Int = 0,
+    val loaded: Boolean = false,
 )

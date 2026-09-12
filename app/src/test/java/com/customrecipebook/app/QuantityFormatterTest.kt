@@ -58,6 +58,16 @@ class QuantityFormatterTest {
     }
 
     @Test
+    fun extractedLinesWithoutUnitsShowNameOnly() {
+        val line = QuantityFormatter.ingredientLine(
+            flour.copy(name = "a pinch of love", quantityUs = 0.0, unitUs = "", quantityMetric = 0.0, unitMetric = ""),
+            UnitSystem.US,
+            1,
+        )
+        assertEquals("a pinch of love", line)
+    }
+
+    @Test
     fun approximateMetricKeepsTilde() {
         val eggs = flour.copy(
             name = "eggs",

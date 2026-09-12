@@ -111,7 +111,11 @@ fun SettingsScreen(app: RecipebookApplication, modifier: Modifier = Modifier) {
                 lineHeight = 20.sp,
             )
             Spacer(Modifier.height(8.dp))
-            Text("OCR is stubbed in this first version.", color = Terracotta, fontSize = 13.sp)
+            Text(
+                "PDF import copies the file and reads a text layer when one exists. Camera photos attach to an editable form.",
+                color = Terracotta,
+                fontSize = 13.sp,
+            )
         }
     }
 }

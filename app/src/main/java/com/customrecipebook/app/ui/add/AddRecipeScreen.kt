@@ -29,6 +29,7 @@ import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.PictureAsPdf
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.SnackbarHost
@@ -81,15 +82,17 @@ fun AddRecipeScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+    var pendingLaunch by remember { mutableStateOf(initialSource) }
 
-    val pdfPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) vm.applyParsedImport(ImportSource.PDF, uri.toString())
+    val pdfPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) vm.importPdf(uri, onReview)
     }
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) vm.applyParsedImport(ImportSource.CAMERA, uri.toString())
+        if (uri != null) vm.importPhoto(uri, onReview)
     }
     val takePicture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
-        if (ok) vm.applyParsedImport(ImportSource.CAMERA, pendingCameraUri?.toString())
+        val uri = pendingCameraUri
+        if (ok && uri != null) vm.importPhoto(uri, onReview)
     }
     val cameraPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -103,7 +106,7 @@ fun AddRecipeScreen(
         }
     }
 
-    fun startPdf() = pdfPicker.launch("application/pdf")
+    fun startPdf() = pdfPicker.launch(arrayOf("application/pdf"))
     fun startCamera() {
         val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
             PackageManager.PERMISSION_GRANTED
@@ -116,11 +119,20 @@ fun AddRecipeScreen(
         }
     }
 
-    LaunchedEffect(initialSource) {
-        when (initialSource) {
-            ImportSource.PDF -> startPdf()
-            ImportSource.CAMERA -> startCamera()
-            ImportSource.MANUAL -> onManual()
+    LaunchedEffect(pendingLaunch) {
+        when (pendingLaunch) {
+            ImportSource.PDF -> {
+                startPdf()
+                pendingLaunch = null
+            }
+            ImportSource.CAMERA -> {
+                startCamera()
+                pendingLaunch = null
+            }
+            ImportSource.MANUAL -> {
+                pendingLaunch = null
+                onManual()
+            }
             else -> Unit
         }
     }
@@ -181,8 +193,21 @@ fun AddRecipeScreen(
                     onClick = onManual,
                 )
 
-                if (state.hasPreview) {
-                    OcrPreviewCard(state)
+                if (state.isParsing) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(CardShape)
+                            .background(Ivory)
+                            .padding(20.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CircularProgressIndicator(color = Terracotta, strokeWidth = 3.dp, modifier = Modifier.size(22.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Text("Reading your file…", color = Espresso, fontSize = 15.sp)
+                    }
+                } else if (state.hasPreview) {
+                    ImportPreviewCard(state)
                 } else {
                     Box(
                         Modifier
@@ -192,7 +217,7 @@ fun AddRecipeScreen(
                             .padding(20.dp),
                     ) {
                         Text(
-                            "Pick a PDF or photo to preview a parsed recipe. OCR is stubbed in v1 with a sample read-through you can review and save.",
+                            "Choose a PDF to copy it into Custom Recipebook. If the file has a text layer, ingredients and steps are filled in for you to edit. Photos open an empty form with the picture attached.",
                             color = Taupe,
                             fontSize = 14.sp,
                             lineHeight = 20.sp,
@@ -277,7 +302,7 @@ private fun ImportRow(
 }
 
 @Composable
-private fun OcrPreviewCard(state: AddRecipeUiState) {
+private fun ImportPreviewCard(state: AddRecipeUiState) {
     val draft = state.draft
     Column(
         Modifier
@@ -286,23 +311,32 @@ private fun OcrPreviewCard(state: AddRecipeUiState) {
             .background(Ivory)
             .padding(20.dp),
     ) {
-        Text("OCR preview", color = Taupe, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-        if (state.parseLabel.isNotBlank()) {
-            Text(state.parseLabel, color = Taupe, fontSize = 12.sp)
+        Text("Import preview", color = Taupe, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        if (draft.attachmentName != null) {
+            Text(draft.attachmentName, color = Taupe, fontSize = 12.sp)
         }
         Spacer(Modifier.height(8.dp))
-        Text(draft.title, color = Espresso, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-        Text(
-            draft.ingredients.take(3).joinToString(" · ") { it.name.substringBefore(",") },
-            color = Taupe,
-            fontSize = 14.sp,
-        )
-        Spacer(Modifier.height(18.dp))
-        Text("Confidence", color = Taupe, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-        Spacer(Modifier.height(10.dp))
-        ConfidenceRow("Title", draft.titleConfidence)
-        ConfidenceRow("Ingredients", draft.ingredientsConfidence)
-        ConfidenceRow("Instructions", draft.instructionsConfidence)
+        Text(draft.title.ifBlank { "Untitled recipe" }, color = Espresso, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+        if (draft.parseMessage.isNotBlank()) {
+            Spacer(Modifier.height(6.dp))
+            Text(draft.parseMessage, color = Taupe, fontSize = 14.sp, lineHeight = 20.sp)
+        }
+        if (draft.ingredients.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            Text(
+                draft.ingredients.take(4).joinToString(" · ") { it.name.substringBefore(",") },
+                color = Espresso,
+                fontSize = 14.sp,
+            )
+        }
+        if (draft.titleConfidence > 0 || draft.ingredientsConfidence > 0 || draft.instructionsConfidence > 0) {
+            Spacer(Modifier.height(18.dp))
+            Text("Read quality", color = Taupe, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(10.dp))
+            ConfidenceRow("Title", draft.titleConfidence)
+            ConfidenceRow("Ingredients", draft.ingredientsConfidence)
+            ConfidenceRow("Instructions", draft.instructionsConfidence)
+        }
     }
 }
 

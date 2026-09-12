@@ -40,6 +40,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.customrecipebook.app.RecipebookApplication
 import com.customrecipebook.app.data.DraftIngredient
+import com.customrecipebook.app.data.ImportSource
 import com.customrecipebook.app.data.repo.RecipeRepository
 import com.customrecipebook.app.ui.components.BackCircle
 import com.customrecipebook.app.ui.components.SoftChip
@@ -85,6 +86,33 @@ fun ManualRecipeScreen(
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (draft.attachmentName != null || draft.parseMessage.isNotBlank()) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Clay)
+                        .padding(14.dp),
+                ) {
+                    Text(
+                        when (draft.source) {
+                            ImportSource.PDF -> "Attached PDF"
+                            ImportSource.CAMERA -> "Attached photo"
+                            else -> "Attachment"
+                        },
+                        color = Taupe,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    if (draft.attachmentName != null) {
+                        Text(draft.attachmentName, color = Espresso, fontWeight = FontWeight.SemiBold)
+                    }
+                    if (draft.parseMessage.isNotBlank()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(draft.parseMessage, color = Taupe, fontSize = 13.sp, lineHeight = 18.sp)
+                    }
+                }
+            }
             Field("Title", draft.title) { vm.updateDraft { d -> d.copy(title = it) } }
             Field("Short description", draft.subtitle) { vm.updateDraft { d -> d.copy(subtitle = it) } }
             Text("Category", color = Taupe, fontSize = 12.sp, fontWeight = FontWeight.Medium)

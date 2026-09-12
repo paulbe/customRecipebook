@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.room.Room
 import com.customrecipebook.app.data.db.AppDatabase
+import com.customrecipebook.app.data.importing.RecipeImporter
 import com.customrecipebook.app.data.prefs.UserPreferences
 import com.customrecipebook.app.data.repo.RecipeRepository
 import com.customrecipebook.app.ui.add.AddRecipeViewModel
@@ -12,7 +13,6 @@ import com.customrecipebook.app.ui.home.HomeViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 
 class RecipebookApplication : Application() {
     lateinit var container: AppContainer
@@ -22,7 +22,6 @@ class RecipebookApplication : Application() {
         super.onCreate()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         container = AppContainer(this, scope)
-        scope.launch { container.repository.seedIfEmpty() }
     }
 }
 
@@ -35,12 +34,14 @@ class AppContainer(app: RecipebookApplication, val scope: CoroutineScope) {
 
     val repository = RecipeRepository(database)
     val preferences = UserPreferences(app)
-    val factory = RecipebookViewModelFactory(repository, preferences)
+    val importer = RecipeImporter(app)
+    val factory = RecipebookViewModelFactory(repository, preferences, importer)
 }
 
 class RecipebookViewModelFactory(
     private val repository: RecipeRepository,
     private val preferences: UserPreferences,
+    private val importer: RecipeImporter,
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -48,7 +49,7 @@ class RecipebookViewModelFactory(
             modelClass.isAssignableFrom(HomeViewModel::class.java) ->
                 HomeViewModel(repository) as T
             modelClass.isAssignableFrom(AddRecipeViewModel::class.java) ->
-                AddRecipeViewModel(repository) as T
+                AddRecipeViewModel(repository, importer) as T
             else -> throw IllegalArgumentException("Unknown ViewModel ${modelClass.name}")
         }
     }

@@ -142,15 +142,19 @@ fun HomeScreen(
                 }
             }
         }
-        if (state.recipes.isEmpty() && !state.isEmptyLibrary) {
-            item {
-                EmptyFilter(state.selectedCategory)
-            }
-        } else if (state.recipes.isEmpty()) {
+        if (!state.loaded) {
             item {
                 Box(Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = Terracotta, strokeWidth = 3.dp)
                 }
+            }
+        } else if (state.totalCount == 0) {
+            item {
+                EmptyLibrary(onAdd = onAdd)
+            }
+        } else if (state.recipes.isEmpty()) {
+            item {
+                EmptyFilter(state.selectedCategory)
             }
         } else {
             items(state.recipes, key = { it.id }) { recipe ->
@@ -223,6 +227,63 @@ private fun RecipeCard(recipe: Recipe, onClick: () -> Unit) {
             )
             Spacer(Modifier.height(8.dp))
             SoftChip(text = recipe.category.label)
+        }
+    }
+}
+
+@Composable
+private fun EmptyLibrary(onAdd: (ImportSource?) -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 20.dp)
+            .clip(CardShape)
+            .background(Ivory)
+            .padding(22.dp),
+    ) {
+        Text("Your book is empty", color = Espresso, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Nothing ships preloaded. Bring a recipe in with a PDF, a photo, or by typing it yourself.",
+            color = Taupe,
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
+        )
+        Spacer(Modifier.height(16.dp))
+        EmptyAction("Upload a PDF", "Parse a saved recipe file", Icons.Outlined.PictureAsPdf) {
+            onAdd(ImportSource.PDF)
+        }
+        EmptyAction("Scan with camera", "Snap a page or pick a photo", Icons.Outlined.CameraAlt) {
+            onAdd(ImportSource.CAMERA)
+        }
+        EmptyAction("Enter manually", "Build it ingredient by ingredient", Icons.Outlined.Edit) {
+            onAdd(ImportSource.MANUAL)
+        }
+    }
+}
+
+@Composable
+private fun EmptyAction(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Clay)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, tint = Terracotta)
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text(title, color = Espresso, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            Text(subtitle, color = Taupe, fontSize = 13.sp)
         }
     }
 }

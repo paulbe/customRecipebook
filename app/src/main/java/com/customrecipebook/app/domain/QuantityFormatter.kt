@@ -46,6 +46,9 @@ object QuantityFormatter {
     }
 
     fun ingredientLine(ingredient: Ingredient, system: UnitSystem, scale: Int): String {
+        if (ingredient.unitUs.isBlank() && ingredient.unitMetric.isBlank()) {
+            return ingredient.name
+        }
         val usQty = ingredient.quantityUs * scale
         val metricQty = ingredient.quantityMetric * scale
         val pair = when (system) {

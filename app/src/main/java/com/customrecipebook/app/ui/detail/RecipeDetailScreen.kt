@@ -1,7 +1,7 @@
 package com.customrecipebook.app.ui.detail
 
+import android.content.Intent
 import android.net.Uri
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -38,11 +38,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.customrecipebook.app.RecipebookApplication
@@ -56,7 +57,6 @@ import com.customrecipebook.app.ui.components.BackCircle
 import com.customrecipebook.app.ui.components.PillShape
 import com.customrecipebook.app.ui.components.RecipeThumb
 import com.customrecipebook.app.ui.components.SoftChip
-import com.customrecipebook.app.ui.components.recipeImageRes
 import com.customrecipebook.app.ui.theme.Clay
 import com.customrecipebook.app.ui.theme.Espresso
 import com.customrecipebook.app.ui.theme.Ivory
@@ -64,6 +64,7 @@ import com.customrecipebook.app.ui.theme.Sand
 import com.customrecipebook.app.ui.theme.SoftLine
 import com.customrecipebook.app.ui.theme.Taupe
 import com.customrecipebook.app.ui.theme.Terracotta
+import java.io.File
 
 @Composable
 fun RecipeDetailScreen(
@@ -166,7 +167,10 @@ fun RecipeDetailScreen(
 
 @Composable
 private fun Hero(recipe: Recipe, onBack: () -> Unit, onToggleSaved: () -> Unit) {
-    val imageRes = recipeImageRes(recipe.imageKey)
+    val context = LocalContext.current
+    val photoModel = recipe.imageUri?.let { path ->
+        if (path.startsWith("/")) File(path) else Uri.parse(path)
+    }
     Box(
         Modifier
             .fillMaxWidth()
@@ -174,14 +178,8 @@ private fun Hero(recipe: Recipe, onBack: () -> Unit, onToggleSaved: () -> Unit) 
             .background(Clay),
     ) {
         when {
-            imageRes != null -> Image(
-                painter = painterResource(imageRes),
-                contentDescription = recipe.title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-            recipe.imageUri != null -> AsyncImage(
-                model = Uri.parse(recipe.imageUri),
+            photoModel != null -> AsyncImage(
+                model = photoModel,
                 contentDescription = recipe.title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
@@ -208,13 +206,16 @@ private fun Hero(recipe: Recipe, onBack: () -> Unit, onToggleSaved: () -> Unit) 
             Spacer(Modifier.weight(1f))
             if (recipe.source == ImportSource.PDF) {
                 Text(
-                    recipe.source.label(),
+                    recipe.attachmentName?.let { "PDF" } ?: recipe.source.label(),
                     color = Espresso,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier
                         .clip(PillShape)
                         .background(Ivory.copy(alpha = 0.94f))
+                        .clickable(enabled = recipe.attachmentUri != null) {
+                            openAttachment(context, recipe)
+                        }
                         .padding(horizontal = 14.dp, vertical = 8.dp),
                 )
                 Spacer(Modifier.width(8.dp))
@@ -235,6 +236,16 @@ private fun Hero(recipe: Recipe, onBack: () -> Unit, onToggleSaved: () -> Unit) 
             }
         }
     }
+}
+
+private fun openAttachment(context: android.content.Context, recipe: Recipe) {
+    val path = recipe.attachmentUri ?: return
+    val file = File(path)
+    if (!file.exists()) return
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    val mime = if (recipe.source == ImportSource.PDF) "application/pdf" else "image/*"
+    val intent = Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    context.startActivity(Intent.createChooser(intent, "Open ${recipe.attachmentName ?: "attachment"}"))
 }
 
 @Composable

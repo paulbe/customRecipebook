@@ -44,11 +44,6 @@ class RecipeRepository(private val db: AppDatabase) {
         }.filter { it.ingredients.isNotEmpty() }
     }
 
-    suspend fun seedIfEmpty() {
-        if (dao.recipeCount() > 0) return
-        SeedData.recipes().forEach { insertRecipe(it) }
-    }
-
     suspend fun setIngredientChecked(id: String, checked: Boolean) {
         dao.setIngredientChecked(id, checked)
     }
@@ -75,6 +70,8 @@ class RecipeRepository(private val db: AppDatabase) {
             difficulty = draft.difficulty.ifBlank { "Easy" },
             imageKey = null,
             imageUri = draft.imageUri,
+            attachmentUri = draft.attachmentUri,
+            attachmentName = draft.attachmentName,
             isSaved = false,
             source = draft.source.name,
             createdAt = now,
@@ -103,48 +100,6 @@ class RecipeRepository(private val db: AppDatabase) {
         }
         dao.insertFullRecipe(recipe, ingredients, directions)
         return id
-    }
-
-    private suspend fun insertRecipe(recipe: Recipe) {
-        dao.insertFullRecipe(
-            recipe = RecipeEntity(
-                id = recipe.id,
-                title = recipe.title,
-                subtitle = recipe.subtitle,
-                category = recipe.category.name,
-                minutes = recipe.minutes,
-                baseServings = recipe.baseServings,
-                servingsUnit = recipe.servingsUnit,
-                difficulty = recipe.difficulty,
-                imageKey = recipe.imageKey,
-                imageUri = recipe.imageUri,
-                isSaved = recipe.isSaved,
-                source = recipe.source.name,
-                createdAt = recipe.createdAt,
-            ),
-            ingredients = recipe.ingredients.map {
-                IngredientEntity(
-                    id = it.id,
-                    recipeId = it.recipeId,
-                    name = it.name,
-                    quantityUs = it.quantityUs,
-                    unitUs = it.unitUs,
-                    quantityMetric = it.quantityMetric,
-                    unitMetric = it.unitMetric,
-                    metricApprox = it.metricApprox,
-                    sortOrder = it.sortOrder,
-                    isChecked = it.isChecked,
-                )
-            },
-            directions = recipe.directions.map {
-                DirectionEntity(
-                    id = it.id,
-                    recipeId = it.recipeId,
-                    stepNumber = it.stepNumber,
-                    text = it.text,
-                )
-            },
-        )
     }
 
     fun filter(recipes: List<Recipe>, category: RecipeCategory): List<Recipe> = when (category) {
