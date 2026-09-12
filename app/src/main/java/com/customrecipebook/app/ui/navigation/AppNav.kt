@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.MenuBook
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.ShoppingBag
 import androidx.compose.material3.Icon
@@ -45,7 +45,7 @@ import com.customrecipebook.app.ui.theme.Taupe
 import com.customrecipebook.app.ui.theme.Terracotta
 
 private enum class Tab(val route: String, val label: String, val icon: ImageVector) {
-    Recipes("recipes", "Recipes", Icons.Outlined.MenuBook),
+    Recipes("recipes", "Recipes", Icons.AutoMirrored.Outlined.MenuBook),
     Shopping("shopping", "Shopping", Icons.Outlined.ShoppingBag),
     Settings("settings", "Settings", Icons.Outlined.Settings),
 }

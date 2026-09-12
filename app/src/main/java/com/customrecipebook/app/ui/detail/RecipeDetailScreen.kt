@@ -294,7 +294,7 @@ private fun ScaleRow(recipe: Recipe, scale: Int, onBump: (Int) -> Unit) {
         Column(horizontalAlignment = Alignment.End) {
             Text("BATCH", color = Taupe, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.6.sp)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                CircleStep(enabled = scale > 1) { onBump(-1) } {
+                CircleStep(enabled = scale > 1, onClick = { onBump(-1) }) {
                     Icon(Icons.Outlined.Remove, contentDescription = "Decrease batch", tint = Espresso, modifier = Modifier.size(18.dp))
                 }
                 Text(
@@ -304,7 +304,7 @@ private fun ScaleRow(recipe: Recipe, scale: Int, onBump: (Int) -> Unit) {
                     fontSize = 20.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
-                CircleStep(enabled = scale < 8) { onBump(1) } {
+                CircleStep(enabled = scale < 8, onClick = { onBump(1) }) {
                     Icon(Icons.Rounded.Add, contentDescription = "Increase batch", tint = Espresso, modifier = Modifier.size(18.dp))
                 }
             }
