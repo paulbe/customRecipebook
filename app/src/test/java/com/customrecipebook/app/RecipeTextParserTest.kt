@@ -36,6 +36,59 @@ class RecipeTextParserTest {
     }
 
     @Test
+    fun parseIngredientLineSplitsQtyUnitName() {
+        val flour = RecipeTextParser.parseIngredientLine("2 cups all-purpose flour")
+        assertEquals("all-purpose flour", flour.name)
+        assertEquals(2.0, flour.quantityUs, 0.01)
+        assertEquals("cups", flour.unitUs)
+        assertEquals(0.0, flour.quantityMetric, 0.01)
+        assertEquals("", flour.unitMetric)
+
+        val soda = RecipeTextParser.parseIngredientLine("1 tsp baking soda")
+        assertEquals("baking soda", soda.name)
+        assertEquals(1.0, soda.quantityUs, 0.01)
+        assertEquals("tsp", soda.unitUs)
+
+        val butter = RecipeTextParser.parseIngredientLine("226 g unsalted butter")
+        assertEquals("unsalted butter", butter.name)
+        assertEquals(226.0, butter.quantityMetric, 0.01)
+        assertEquals("g", butter.unitMetric)
+        assertEquals(0.0, butter.quantityUs, 0.01)
+        assertEquals("", butter.unitUs)
+    }
+
+    @Test
+    fun parseIngredientLineDoesNotInventUnitOrQty() {
+        val eggs = RecipeTextParser.parseIngredientLine("2 eggs")
+        assertEquals("eggs", eggs.name)
+        assertEquals(2.0, eggs.quantityUs, 0.01)
+        assertEquals("", eggs.unitUs)
+
+        val large = RecipeTextParser.parseIngredientLine("2 large eggs")
+        assertEquals("eggs", large.name)
+        assertEquals(2.0, large.quantityUs, 0.01)
+        assertEquals("large", large.unitUs)
+
+        val pinch = RecipeTextParser.parseIngredientLine("a pinch of love")
+        assertEquals("a pinch of love", pinch.name)
+        assertEquals(0.0, pinch.quantityUs, 0.01)
+        assertEquals("", pinch.unitUs)
+    }
+
+    @Test
+    fun parseIngredientLineReadsFormattedShape() {
+        val flour = RecipeTextParser.parseIngredientLine("2: (cups) (all-purpose flour)")
+        assertEquals("all-purpose flour", flour.name)
+        assertEquals(2.0, flour.quantityUs, 0.01)
+        assertEquals("cups", flour.unitUs)
+
+        val eggs = RecipeTextParser.parseIngredientLine("2: () (eggs)")
+        assertEquals("eggs", eggs.name)
+        assertEquals(2.0, eggs.quantityUs, 0.01)
+        assertEquals("", eggs.unitUs)
+    }
+
+    @Test
     fun emptyTextUsesFallbackAndIsNotExtracted() {
         val parsed = RecipeTextParser.parse("   \n  ", "From Filename")
         assertEquals("From Filename", parsed.title)

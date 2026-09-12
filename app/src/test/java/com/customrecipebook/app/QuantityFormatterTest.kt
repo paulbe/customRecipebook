@@ -1,10 +1,10 @@
 package com.customrecipebook.app
 
+import com.customrecipebook.app.data.DraftIngredient
 import com.customrecipebook.app.data.Ingredient
 import com.customrecipebook.app.data.UnitSystem
 import com.customrecipebook.app.domain.QuantityFormatter
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class QuantityFormatterTest {
@@ -33,21 +33,23 @@ class QuantityFormatterTest {
     }
 
     @Test
-    fun usLineShowsMetricInParentheses() {
+    fun usLineUsesQtyUnitNameShape() {
         val line = QuantityFormatter.ingredientLine(flour, UnitSystem.US, scale = 1)
-        assertEquals("2 cups (240 g) all-purpose flour", line)
+        assertEquals("2: (cups) (all-purpose flour)", line)
     }
 
     @Test
-    fun metricLineShowsUsInParentheses() {
+    fun metricLineUsesQtyUnitNameShape() {
         val line = QuantityFormatter.ingredientLine(flour, UnitSystem.METRIC, scale = 1)
-        assertEquals("240 g (2 cups) all-purpose flour", line)
+        assertEquals("240: (g) (all-purpose flour)", line)
     }
 
     @Test
-    fun batchScaleDoublesBothUnits() {
+    fun batchScaleUsesStructuredQtyNotReparse() {
         val line = QuantityFormatter.ingredientLine(flour, UnitSystem.US, scale = 2)
-        assertEquals("4 cups (480 g) all-purpose flour", line)
+        assertEquals("4: (cups) (all-purpose flour)", line)
+        val metric = QuantityFormatter.ingredientLine(flour, UnitSystem.METRIC, scale = 2)
+        assertEquals("480: (g) (all-purpose flour)", metric)
     }
 
     @Test
@@ -58,26 +60,63 @@ class QuantityFormatterTest {
     }
 
     @Test
-    fun extractedLinesWithoutUnitsShowNameOnly() {
+    fun missingQuantityIsNotInvented() {
         val line = QuantityFormatter.ingredientLine(
             flour.copy(name = "a pinch of love", quantityUs = 0.0, unitUs = "", quantityMetric = 0.0, unitMetric = ""),
             UnitSystem.US,
             1,
         )
-        assertEquals("a pinch of love", line)
+        assertEquals(": () (a pinch of love)", line)
     }
 
     @Test
-    fun approximateMetricKeepsTilde() {
+    fun quantityWithoutUnitKeepsEmptyParentheses() {
+        val eggs = flour.copy(
+            name = "eggs",
+            quantityUs = 2.0,
+            unitUs = "",
+            quantityMetric = 0.0,
+            unitMetric = "",
+        )
+        assertEquals("2: () (eggs)", QuantityFormatter.ingredientLine(eggs, UnitSystem.US, 1))
+        assertEquals("2: () (eggs)", QuantityFormatter.ingredientLine(eggs, UnitSystem.METRIC, 1))
+    }
+
+    @Test
+    fun sourceUnitIsKeptWhenPresent() {
         val eggs = flour.copy(
             name = "eggs",
             quantityUs = 2.0,
             unitUs = "large",
-            quantityMetric = 100.0,
-            unitMetric = "g",
-            metricApprox = true,
+            quantityMetric = 0.0,
+            unitMetric = "",
         )
-        val line = QuantityFormatter.ingredientLine(eggs, UnitSystem.US, 1)
-        assertTrue(line.contains("~100 g"))
+        assertEquals("2: (large) (eggs)", QuantityFormatter.ingredientLine(eggs, UnitSystem.US, 1))
+    }
+
+    @Test
+    fun draftPreviewMatchesSavedLineShape() {
+        val draft = DraftIngredient(
+            name = "baking soda",
+            quantityUs = 1.0,
+            unitUs = "tsp",
+            quantityMetric = 5.0,
+            unitMetric = "g",
+        )
+        assertEquals("1: (tsp) (baking soda)", QuantityFormatter.ingredientLine(draft, UnitSystem.US))
+        assertEquals("5: (g) (baking soda)", QuantityFormatter.ingredientLine(draft, UnitSystem.METRIC))
+    }
+
+    @Test
+    fun metricOnlyFallsBackWhenUsEmpty() {
+        val butter = flour.copy(
+            name = "unsalted butter",
+            quantityUs = 0.0,
+            unitUs = "",
+            quantityMetric = 226.0,
+            unitMetric = "g",
+        )
+        assertEquals("226: (g) (unsalted butter)", QuantityFormatter.ingredientLine(butter, UnitSystem.METRIC, 1))
+        assertEquals("226: (g) (unsalted butter)", QuantityFormatter.ingredientLine(butter, UnitSystem.US, 1))
     }
 }

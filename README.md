@@ -1,6 +1,6 @@
 # Custom Recipebook
 
-A Kotlin + Jetpack Compose cookbook for Android. Keep family recipes in a warm terracotta-and-sand book: import a PDF, snap a page, or type a recipe by hand. Ingredient lines toggle as a checklist, US/Metric units sit side by side, and a batch scaler multiplies every quantity.
+A Kotlin + Jetpack Compose cookbook for Android. Keep family recipes in a warm terracotta-and-sand book: import a PDF, snap a page, or type a recipe by hand. Ingredient lines toggle as a checklist, format as `qty: (unit) (name)`, switch US ↔ Metric from the stored fields, and a batch scaler multiplies every quantity.
 
 The book ships **empty**. Everything on Home comes from a PDF, a photo, or a recipe you type.
 
@@ -9,7 +9,7 @@ The book ships **empty**. Everything on Home comes from a PDF, a photo, or a rec
 - **Recipes home** — Custom Recipebook header, PDF / Camera / Manual chips, All · Dinner · Baking · Saved filters. Empty state nudges those three import paths.
 - **Add recipe** — pick a PDF (`application/pdf` document picker), take or choose a photo, or enter a recipe manually.
 - **PDF import** — copies the file into app storage, reads a text layer when one exists, prefills title (from the filename or the first line), ingredients, and steps, then opens an editable Review form. If extract fails, the PDF is still attached and you fill the form.
-- **Recipe detail** — optional hero photo, US ↔ Metric toggle, servings + batch scale (− / N× / +), tappable ingredient checklist, numbered directions. PDF recipes can reopen the attached file.
+- **Recipe detail** — optional hero photo, US ↔ Metric toggle, servings + batch scale (− / N× / +), tappable ingredient checklist (`2: (cups) (all-purpose flour)`), numbered directions. PDF recipes can reopen the attached file.
 - **Shopping & Settings** — shopping lists ingredients you’ve checked off; settings stores the default unit system and can clear checklists.
 - **Local persistence** — Room for recipes, attachments, and checklist state; DataStore for the unit preference. No account or backend.
 

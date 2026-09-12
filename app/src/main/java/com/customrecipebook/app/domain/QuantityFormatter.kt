@@ -1,5 +1,6 @@
 package com.customrecipebook.app.domain
 
+import com.customrecipebook.app.data.DraftIngredient
 import com.customrecipebook.app.data.Ingredient
 import com.customrecipebook.app.data.UnitSystem
 import kotlin.math.abs
@@ -32,43 +33,56 @@ object QuantityFormatter {
         }
     }
 
-    fun formatPair(
-        primaryAmount: Double,
-        primaryUnit: String,
-        secondaryAmount: Double,
-        secondaryUnit: String,
-        secondaryApprox: Boolean = false,
-    ): String {
-        val primary = "${formatAmount(primaryAmount)} $primaryUnit".trim()
-        val prefix = if (secondaryApprox) "~" else ""
-        val secondary = "$prefix${formatAmount(secondaryAmount)} $secondaryUnit".trim()
-        return "$primary ($secondary)"
+    /**
+     * Display shape: `qty: (unit) (ingredient name)`.
+     * Empty unit stays as `()`. A missing quantity is not invented — the number is omitted.
+     */
+    fun structuredLine(quantity: Double, unit: String, name: String, scale: Int = 1): String {
+        val qtyText = if (quantity > 0.0) formatAmount(quantity * scale) else ""
+        return "$qtyText: (${unit.trim()}) (${name.trim()})"
     }
 
     fun ingredientLine(ingredient: Ingredient, system: UnitSystem, scale: Int): String {
-        if (ingredient.unitUs.isBlank() && ingredient.unitMetric.isBlank()) {
-            return ingredient.name
-        }
-        val usQty = ingredient.quantityUs * scale
-        val metricQty = ingredient.quantityMetric * scale
-        val pair = when (system) {
-            UnitSystem.US -> formatPair(
-                usQty,
-                ingredient.unitUs,
-                metricQty,
-                ingredient.unitMetric,
-                ingredient.metricApprox,
-            )
-            UnitSystem.METRIC -> formatPair(
-                metricQty,
-                ingredient.unitMetric,
-                usQty,
-                ingredient.unitUs,
-                secondaryApprox = false,
-            )
-        }
-        return "$pair ${ingredient.name}".trim()
+        val (quantity, unit) = pickFields(
+            quantityUs = ingredient.quantityUs,
+            unitUs = ingredient.unitUs,
+            quantityMetric = ingredient.quantityMetric,
+            unitMetric = ingredient.unitMetric,
+            system = system,
+        )
+        return structuredLine(quantity, unit, ingredient.name, scale)
     }
+
+    fun ingredientLine(ingredient: DraftIngredient, system: UnitSystem, scale: Int = 1): String {
+        val (quantity, unit) = pickFields(
+            quantityUs = ingredient.quantityUs,
+            unitUs = ingredient.unitUs,
+            quantityMetric = ingredient.quantityMetric,
+            unitMetric = ingredient.unitMetric,
+            system = system,
+        )
+        return structuredLine(quantity, unit, ingredient.name, scale)
+    }
+
+    private fun pickFields(
+        quantityUs: Double,
+        unitUs: String,
+        quantityMetric: Double,
+        unitMetric: String,
+        system: UnitSystem,
+    ): Pair<Double, String> {
+        val us = quantityUs to unitUs
+        val metric = quantityMetric to unitMetric
+        val usPresent = hasMeasurement(quantityUs, unitUs)
+        val metricPresent = hasMeasurement(quantityMetric, unitMetric)
+        return when (system) {
+            UnitSystem.US -> if (usPresent) us else if (metricPresent) metric else 0.0 to ""
+            UnitSystem.METRIC -> if (metricPresent) metric else if (usPresent) us else 0.0 to ""
+        }
+    }
+
+    private fun hasMeasurement(quantity: Double, unit: String): Boolean =
+        quantity > 0.0 || unit.isNotBlank()
 
     fun formatMinutes(minutes: Int): String {
         return if (minutes >= 60 && minutes % 60 == 0) {

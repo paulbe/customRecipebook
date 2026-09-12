@@ -32,9 +32,17 @@ object RecipeTextParser {
         "cloves", "clove", "large", "medium", "small", "pinch", "dash",
         "cans", "can", "sticks", "stick", "slices", "slice",
     )
+    private val metricUnits = setOf(
+        "g", "kg", "ml", "l", "grams", "gram", "milliliters", "millilitre", "liters", "litre",
+    )
     private val unitPattern = units.joinToString("|") { Regex.escape(it) }
+    private val qtyToken = """(?:\d+\s+\d+/\d+|\d+/\d+|\d+(?:\.\d+)?|[¼½¾⅓⅔])"""
+    private val formattedLine = Regex(
+        """^($qtyToken)?:\s*\(([^)]*)\)\s*\((.+)\)\s*$""",
+        RegexOption.IGNORE_CASE,
+    )
     private val qtyPattern = Regex(
-        """^(?:(\d+\s+\d+/\d+|\d+/\d+|\d+(?:\.\d+)?|[¼½¾⅓⅔]))\s*(?:($unitPattern))?\b[:\s,]*(.*)$""",
+        """^($qtyToken)\s*(?:($unitPattern))?\b[:\s,]*(.*)$""",
         RegexOption.IGNORE_CASE,
     )
     private val numbered = Regex("""^\d+[\.)]\s*(.*)$""")
@@ -153,19 +161,21 @@ object RecipeTextParser {
     }
 
     fun parseIngredientLine(line: String): DraftIngredient {
-        val cleaned = line.replace(Regex("^[-•*–]\\s*"), "")
+        val cleaned = line.replace(Regex("^[-•*–]\\s*"), "").trim()
+        val formatted = formattedLine.find(cleaned)
+        if (formatted != null) {
+            val qtyRaw = formatted.groupValues[1]
+            val qty = if (qtyRaw.isBlank()) 0.0 else parseAmount(qtyRaw)
+            val unit = formatted.groupValues[2].trim()
+            val name = formatted.groupValues[3].trim().ifBlank { cleaned }
+            return draftFromParts(name, qty, unit)
+        }
         val match = qtyPattern.find(cleaned)
         if (match != null) {
             val qty = parseAmount(match.groupValues[1])
             val unit = match.groupValues[2].ifBlank { "" }
-            val name = match.groupValues[3].ifBlank { cleaned }
-            return DraftIngredient(
-                name = name.trim(),
-                quantityUs = qty,
-                unitUs = normalizeUnit(unit),
-                quantityMetric = 0.0,
-                unitMetric = "",
-            )
+            val name = match.groupValues[3].ifBlank { cleaned }.trim()
+            return draftFromParts(name, qty, unit)
         }
         return DraftIngredient(
             name = cleaned,
@@ -175,6 +185,30 @@ object RecipeTextParser {
             unitMetric = "",
         )
     }
+
+    private fun draftFromParts(name: String, qty: Double, rawUnit: String): DraftIngredient {
+        val unit = normalizeUnit(rawUnit)
+        return if (isMetricUnit(rawUnit, unit)) {
+            DraftIngredient(
+                name = name,
+                quantityUs = 0.0,
+                unitUs = "",
+                quantityMetric = qty,
+                unitMetric = unit,
+            )
+        } else {
+            DraftIngredient(
+                name = name,
+                quantityUs = qty,
+                unitUs = unit,
+                quantityMetric = 0.0,
+                unitMetric = "",
+            )
+        }
+    }
+
+    private fun isMetricUnit(rawUnit: String, normalized: String): Boolean =
+        rawUnit.lowercase() in metricUnits || normalized in metricUnits
 
     private fun classifyUnknown(
         line: String,
@@ -189,8 +223,10 @@ object RecipeTextParser {
         }
     }
 
-    private fun looksLikeIngredient(line: String): Boolean =
-        qtyPattern.containsMatchIn(line.replace(Regex("^[-•*–]\\s*"), ""))
+    private fun looksLikeIngredient(line: String): Boolean {
+        val cleaned = line.replace(Regex("^[-•*–]\\s*"), "")
+        return formattedLine.containsMatchIn(cleaned) || qtyPattern.containsMatchIn(cleaned)
+    }
 
     private fun headerKind(line: String): Section? {
         val key = line.lowercase().trim().trimEnd(':').trim()

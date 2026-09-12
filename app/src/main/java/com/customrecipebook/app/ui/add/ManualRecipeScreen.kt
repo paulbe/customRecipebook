@@ -41,7 +41,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.customrecipebook.app.RecipebookApplication
 import com.customrecipebook.app.data.DraftIngredient
 import com.customrecipebook.app.data.ImportSource
+import com.customrecipebook.app.data.UnitSystem
 import com.customrecipebook.app.data.repo.RecipeRepository
+import com.customrecipebook.app.domain.QuantityFormatter
 import com.customrecipebook.app.ui.components.BackCircle
 import com.customrecipebook.app.ui.components.SoftChip
 import com.customrecipebook.app.ui.theme.Clay
@@ -234,6 +236,19 @@ private fun IngredientEditor(item: DraftIngredient, onChange: (DraftIngredient) 
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        Text(
+            QuantityFormatter.ingredientLine(item, UnitSystem.US),
+            color = Espresso,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        if (item.quantityMetric > 0.0 || item.unitMetric.isNotBlank()) {
+            Text(
+                QuantityFormatter.ingredientLine(item, UnitSystem.METRIC),
+                color = Taupe,
+                fontSize = 13.sp,
+            )
+        }
         Field("Name", item.name, compact = true) { onChange(item.copy(name = it)) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(Modifier.weight(1f)) {

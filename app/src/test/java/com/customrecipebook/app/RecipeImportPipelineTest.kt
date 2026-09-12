@@ -1,6 +1,8 @@
 package com.customrecipebook.app
 
+import com.customrecipebook.app.data.UnitSystem
 import com.customrecipebook.app.domain.PdfStreamTextExtractor
+import com.customrecipebook.app.domain.QuantityFormatter
 import com.customrecipebook.app.domain.RecipeTextParser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -27,6 +29,15 @@ class RecipeImportPipelineTest {
         assertTrue("ingredients should be filled", draft.ingredients.size >= 3)
         assertTrue("directions should be filled", draft.directions.size >= 3)
         assertEquals("all-purpose flour", draft.ingredients.first().name)
+        assertEquals(
+            "2: (cups) (all-purpose flour)",
+            QuantityFormatter.ingredientLine(draft.ingredients.first(), UnitSystem.US),
+        )
+        assertEquals("baking soda", draft.ingredients[1].name)
+        assertEquals(
+            "1: (tsp) (baking soda)",
+            QuantityFormatter.ingredientLine(draft.ingredients[1], UnitSystem.US),
+        )
         assertTrue(draft.directions.first().contains("Preheat"))
         assertTrue(draft.parseMessage.contains("3 ingredients") || draft.ingredients.isNotEmpty())
     }

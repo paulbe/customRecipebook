@@ -22,6 +22,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.customrecipebook.app.RecipebookApplication
+import com.customrecipebook.app.data.UnitSystem
+import com.customrecipebook.app.domain.QuantityFormatter
 import com.customrecipebook.app.ui.components.CardShape
 import com.customrecipebook.app.ui.theme.Clay
 import com.customrecipebook.app.ui.theme.Espresso
@@ -33,6 +35,7 @@ import com.customrecipebook.app.ui.theme.Terracotta
 @Composable
 fun ShoppingScreen(app: RecipebookApplication, modifier: Modifier = Modifier) {
     val checked by app.container.repository.checkedIngredients.collectAsStateWithLifecycle(emptyList())
+    val units by app.container.preferences.unitSystem.collectAsStateWithLifecycle(UnitSystem.US)
 
     Column(
         modifier
@@ -77,7 +80,12 @@ fun ShoppingScreen(app: RecipebookApplication, modifier: Modifier = Modifier) {
                     Text(recipe.title, color = Espresso, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                     Spacer(Modifier.height(8.dp))
                     recipe.ingredients.forEach { ingredient ->
-                        Text("•  ${ingredient.name}", color = Espresso, fontSize = 16.sp, modifier = Modifier.padding(vertical = 3.dp))
+                        Text(
+                            QuantityFormatter.ingredientLine(ingredient, units, scale = 1),
+                            color = Espresso,
+                            fontSize = 16.sp,
+                            modifier = Modifier.padding(vertical = 3.dp),
+                        )
                     }
                 }
             }

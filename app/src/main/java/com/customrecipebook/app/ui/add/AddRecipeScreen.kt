@@ -57,6 +57,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.customrecipebook.app.RecipebookApplication
 import com.customrecipebook.app.data.ImportSource
+import com.customrecipebook.app.data.UnitSystem
+import com.customrecipebook.app.domain.QuantityFormatter
 import com.customrecipebook.app.ui.components.BackCircle
 import com.customrecipebook.app.ui.components.CardShape
 import com.customrecipebook.app.ui.theme.Clay
@@ -323,11 +325,14 @@ private fun ImportPreviewCard(state: AddRecipeUiState) {
         }
         if (draft.ingredients.isNotEmpty()) {
             Spacer(Modifier.height(10.dp))
-            Text(
-                draft.ingredients.take(4).joinToString(" · ") { it.name.substringBefore(",") },
-                color = Espresso,
-                fontSize = 14.sp,
-            )
+            draft.ingredients.take(4).forEach { item ->
+                Text(
+                    QuantityFormatter.ingredientLine(item, UnitSystem.US),
+                    color = Espresso,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(vertical = 2.dp),
+                )
+            }
         }
         if (draft.titleConfidence > 0 || draft.ingredientsConfidence > 0 || draft.instructionsConfidence > 0) {
             Spacer(Modifier.height(18.dp))
