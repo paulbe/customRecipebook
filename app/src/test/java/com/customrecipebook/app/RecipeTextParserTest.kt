@@ -77,15 +77,20 @@ class RecipeTextParserTest {
 
     @Test
     fun parseIngredientLineReadsFormattedShape() {
-        val flour = RecipeTextParser.parseIngredientLine("2: (cups) (all-purpose flour)")
+        val flour = RecipeTextParser.parseIngredientLine("2: cups all-purpose flour")
         assertEquals("all-purpose flour", flour.name)
         assertEquals(2.0, flour.quantityUs, 0.01)
         assertEquals("cups", flour.unitUs)
 
-        val eggs = RecipeTextParser.parseIngredientLine("2: () (eggs)")
+        val eggs = RecipeTextParser.parseIngredientLine("2: eggs")
         assertEquals("eggs", eggs.name)
         assertEquals(2.0, eggs.quantityUs, 0.01)
         assertEquals("", eggs.unitUs)
+
+        val legacy = RecipeTextParser.parseIngredientLine("2: (cups) (all-purpose flour)")
+        assertEquals("all-purpose flour", legacy.name)
+        assertEquals(2.0, legacy.quantityUs, 0.01)
+        assertEquals("cups", legacy.unitUs)
     }
 
     @Test

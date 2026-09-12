@@ -30,12 +30,12 @@ class RecipeImportPipelineTest {
         assertTrue("directions should be filled", draft.directions.size >= 3)
         assertEquals("all-purpose flour", draft.ingredients.first().name)
         assertEquals(
-            "2: (cups) (all-purpose flour)",
+            "2: cups all-purpose flour",
             QuantityFormatter.ingredientLine(draft.ingredients.first(), UnitSystem.US),
         )
         assertEquals("baking soda", draft.ingredients[1].name)
         assertEquals(
-            "1: (tsp) (baking soda)",
+            "1: tsp baking soda",
             QuantityFormatter.ingredientLine(draft.ingredients[1], UnitSystem.US),
         )
         assertTrue(draft.directions.first().contains("Preheat"))

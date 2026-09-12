@@ -37,8 +37,12 @@ object RecipeTextParser {
     )
     private val unitPattern = units.joinToString("|") { Regex.escape(it) }
     private val qtyToken = """(?:\d+\s+\d+/\d+|\d+/\d+|\d+(?:\.\d+)?|[¼½¾⅓⅔])"""
-    private val formattedLine = Regex(
+    private val formattedParenLine = Regex(
         """^($qtyToken)?:\s*\(([^)]*)\)\s*\((.+)\)\s*$""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val formattedLine = Regex(
+        """^($qtyToken):\s+(?:($unitPattern)\b\s+)?(.+)$""",
         RegexOption.IGNORE_CASE,
     )
     private val qtyPattern = Regex(
@@ -162,10 +166,17 @@ object RecipeTextParser {
 
     fun parseIngredientLine(line: String): DraftIngredient {
         val cleaned = line.replace(Regex("^[-•*–]\\s*"), "").trim()
+        val paren = formattedParenLine.find(cleaned)
+        if (paren != null) {
+            val qtyRaw = paren.groupValues[1]
+            val qty = if (qtyRaw.isBlank()) 0.0 else parseAmount(qtyRaw)
+            val unit = paren.groupValues[2].trim()
+            val name = paren.groupValues[3].trim().ifBlank { cleaned }
+            return draftFromParts(name, qty, unit)
+        }
         val formatted = formattedLine.find(cleaned)
         if (formatted != null) {
-            val qtyRaw = formatted.groupValues[1]
-            val qty = if (qtyRaw.isBlank()) 0.0 else parseAmount(qtyRaw)
+            val qty = parseAmount(formatted.groupValues[1])
             val unit = formatted.groupValues[2].trim()
             val name = formatted.groupValues[3].trim().ifBlank { cleaned }
             return draftFromParts(name, qty, unit)
@@ -225,7 +236,9 @@ object RecipeTextParser {
 
     private fun looksLikeIngredient(line: String): Boolean {
         val cleaned = line.replace(Regex("^[-•*–]\\s*"), "")
-        return formattedLine.containsMatchIn(cleaned) || qtyPattern.containsMatchIn(cleaned)
+        return formattedParenLine.containsMatchIn(cleaned) ||
+            formattedLine.containsMatchIn(cleaned) ||
+            qtyPattern.containsMatchIn(cleaned)
     }
 
     private fun headerKind(line: String): Section? {
