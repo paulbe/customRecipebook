@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="sand">#FCF4E8</color>
+    <color name="ivory">#FFFBF5</color>
+    <color name="clay">#F5E8D6</color>
+    <color name="espresso">#3E271C</color>
+    <color name="taupe">#8C705C</color>
+    <color name="terracotta">#C25C3A</color>
+    <color name="dark_terracotta">#A0462A</color>
+    <color name="ic_launcher_background">#FCF4E8</color>
+</resources>
