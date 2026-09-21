@@ -54,10 +54,15 @@ object RecipeTextParser {
         RegexOption.IGNORE_CASE,
     )
     private val numbered = Regex("""^\d+[\.)]\s*(.*)$""")
+    private val stepLabel = Regex(
+        """^(?:(?i:step)\s+\d+\s*[:.\-)]*\s*|\d+[.)]\s*|\d{1,2}\s+(?=[A-Z][a-z]{2,}))""",
+    )
     private val headerSplit = Regex(
         """(?i)(?<=\S)\s*(?=\b(?:ingredients?|directions?|instructions?|method|steps|preparation)\b)""",
     )
-    private val stepSplit = Regex("""(?<!\n)\s+(?=\d+[.)]\s+)""")
+    private val stepSplit = Regex(
+        """(?<=\S)\s+(?=(?:(?i:step)\s+\d+\s*[:.\-)]*|\d+[.)]\s*))""",
+    )
     private val qtySplit = Regex(
         """(?<!\n)\s+(?=[-•*]?\s*\d+(?:\s+\d+/\d+)?\s+(?:$unitPattern)\b)""",
         RegexOption.IGNORE_CASE,
@@ -111,7 +116,7 @@ object RecipeTextParser {
             }
             when (section) {
                 Section.INGREDIENTS -> ingredients += parseIngredientLine(line)
-                Section.DIRECTIONS -> directions += stripNumber(line)
+                Section.DIRECTIONS -> addDirectionLine(line, directions)
                 Section.UNKNOWN -> classifyUnknown(line, ingredients, directions)
             }
         }
@@ -238,8 +243,10 @@ object RecipeTextParser {
         directions: MutableList<String>,
     ) {
         when {
+            startsWithStep(line) || splitDirectionSteps(line).size > 1 ->
+                addDirectionLine(line, directions)
             looksLikeIngredient(line) -> ingredients += parseIngredientLine(line)
-            numbered.matches(line) -> directions += stripNumber(line)
+            numbered.matches(line) -> addDirectionLine(line, directions)
             line.startsWith("-") || line.startsWith("•") || line.startsWith("*") ->
                 ingredients += parseIngredientLine(line)
         }
@@ -264,8 +271,69 @@ object RecipeTextParser {
         return null
     }
 
-    private fun stripNumber(line: String): String =
-        numbered.matchEntire(line)?.groupValues?.get(1)?.takeIf { it.isNotBlank() } ?: line
+    private fun addDirectionLine(line: String, directions: MutableList<String>) {
+        val pieces = splitDirectionSteps(line)
+        if (pieces.isEmpty()) return
+        val continuation = !startsWithStep(line) && directions.isNotEmpty() && pieces.size == 1
+        if (continuation) {
+            val extra = stripStepLabel(pieces[0])
+            if (extra.isNotBlank()) {
+                directions[directions.lastIndex] = "${directions.last()} $extra".trim()
+            }
+            return
+        }
+        for (piece in pieces) {
+            val body = stripStepLabel(piece)
+            if (body.isNotBlank()) directions += body
+        }
+    }
+
+    private fun splitDirectionSteps(text: String): List<String> {
+        val trimmed = text.trim()
+        if (trimmed.isBlank()) return emptyList()
+        val markers = stepMarkerStarts(trimmed)
+        val starts = when {
+            markers.isEmpty() -> listOf(0)
+            markers.first() == 0 -> markers
+            else -> listOf(0) + markers
+        }.distinct()
+        return starts.mapIndexed { i, from ->
+            val to = starts.getOrNull(i + 1) ?: trimmed.length
+            trimmed.substring(from, to).trim()
+        }.filter { it.isNotEmpty() }
+    }
+
+    private fun stepMarkerStarts(text: String): List<Int> {
+        val namedRanges = Regex("""(?i:step)\s+\d+\s*[:.\-)]*""").findAll(text).map { it.range }.toList()
+        val starts = mutableListOf<Int>()
+        fun atBoundary(index: Int): Boolean =
+            index == 0 || text.getOrNull(index - 1)?.isWhitespace() == true
+        fun insideNamed(index: Int): Boolean = namedRanges.any { index in it }
+        namedRanges.forEach { range ->
+            if (atBoundary(range.first)) starts += range.first
+        }
+        Regex("""\d+[.)]\s*""").findAll(text).forEach { match ->
+            val index = match.range.first
+            if (atBoundary(index) && !insideNamed(index)) starts += index
+        }
+        Regex("""\d{1,2}\s+(?=[A-Z][a-z]{2,})""").findAll(text).forEach { match ->
+            val index = match.range.first
+            if (atBoundary(index) && !insideNamed(index)) starts += index
+        }
+        return starts.distinct().sorted()
+    }
+
+    private fun startsWithStep(line: String): Boolean =
+        stepLabel.find(line.trim())?.range?.first == 0
+
+    private fun stripStepLabel(line: String): String {
+        val trimmed = line.trim()
+        val match = stepLabel.find(trimmed)
+        if (match != null && match.range.first == 0) {
+            return trimmed.substring(match.range.last + 1).trim()
+        }
+        return numbered.matchEntire(trimmed)?.groupValues?.get(1)?.takeIf { it.isNotBlank() } ?: trimmed
+    }
 
     private fun parseAmount(raw: String): Double {
         val value = raw.trim()

@@ -36,6 +36,80 @@ class RecipeTextParserTest {
     }
 
     @Test
+    fun gluedNumberedDirectionsBecomeSeparateSteps() {
+        val parsed = RecipeTextParser.parse(
+            """
+            Soup
+            Ingredients
+            2 cups broth
+            Directions
+            1. Mix flour until combined. 2. Bake 12 min.
+            """.trimIndent(),
+            "Fallback",
+        )
+        assertEquals(listOf("Mix flour until combined.", "Bake 12 min."), parsed.directions)
+        assertEquals("broth", parsed.ingredients.single().name)
+    }
+
+    @Test
+    fun stepLabelsAndBareNumbersSplitAndStrip() {
+        val parens = RecipeTextParser.parse(
+            """
+            Cake
+            Ingredients
+            1 cup sugar
+            Directions
+            1) Mix the batter 2) Bake until golden
+            """.trimIndent(),
+            "Fallback",
+        )
+        assertEquals(listOf("Mix the batter", "Bake until golden"), parens.directions)
+
+        val named = RecipeTextParser.parse(
+            """
+            Cake
+            Ingredients
+            1 cup sugar
+            Directions
+            Step 1 Mix the batter
+            Step 2 Bake until golden
+            """.trimIndent(),
+            "Fallback",
+        )
+        assertEquals(listOf("Mix the batter", "Bake until golden"), named.directions)
+
+        val bare = RecipeTextParser.parse(
+            """
+            Cake
+            Ingredients
+            1 cup sugar
+            Directions
+            1 Mix the batter
+            2 Bake until golden
+            """.trimIndent(),
+            "Fallback",
+        )
+        assertEquals(listOf("Mix the batter", "Bake until golden"), bare.directions)
+    }
+
+    @Test
+    fun wrappedDirectionContinuesThePreviousStep() {
+        val parsed = RecipeTextParser.parse(
+            """
+            Soup
+            Ingredients
+            2 cups broth
+            Directions
+            1. Mix flour and
+            sugar together.
+            2. Bake.
+            """.trimIndent(),
+            "Fallback",
+        )
+        assertEquals(listOf("Mix flour and sugar together.", "Bake."), parsed.directions)
+    }
+
+    @Test
     fun parseIngredientLineSplitsQtyUnitName() {
         val flour = RecipeTextParser.parseIngredientLine("2 cups all-purpose flour")
         assertEquals("all-purpose flour", flour.name)
