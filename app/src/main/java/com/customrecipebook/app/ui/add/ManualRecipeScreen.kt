@@ -13,21 +13,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -44,9 +35,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.customrecipebook.app.RecipebookApplication
 import com.customrecipebook.app.data.DraftIngredient
 import com.customrecipebook.app.data.ImportSource
-import com.customrecipebook.app.data.UnitSystem
 import com.customrecipebook.app.data.repo.RecipeRepository
-import com.customrecipebook.app.domain.QuantityFormatter
 import com.customrecipebook.app.ui.components.BackCircle
 import com.customrecipebook.app.ui.components.SoftChip
 import com.customrecipebook.app.ui.theme.Clay
@@ -66,6 +55,7 @@ fun ManualRecipeScreen(
     val vm: AddRecipeViewModel = viewModel(activity, factory = app.container.factory)
     val state by vm.state.collectAsStateWithLifecycle()
     val draft = state.draft
+    val pdfImport = draft.source == ImportSource.PDF && state.editingRecipeId == null
 
     Column(
         Modifier
@@ -82,13 +72,35 @@ fun ManualRecipeScreen(
             BackCircle(onClick = onBack)
             Spacer(Modifier.width(12.dp))
             Text(
-                if (state.editingRecipeId != null) "Edit recipe" else "Recipe details",
+                when {
+                    state.editingRecipeId != null -> "Edit recipe"
+                    pdfImport -> "Review PDF"
+                    else -> "Recipe details"
+                },
                 color = Espresso,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.SemiBold,
             )
         }
 
+        if (pdfImport) {
+            Box(Modifier.padding(horizontal = 20.dp).weight(1f)) {
+                PdfImportWizard(draft = draft, vm = vm, onSaved = onSaved)
+            }
+        } else {
+            SinglePageEditor(state = state, vm = vm, onSaved = onSaved)
+        }
+    }
+}
+
+@Composable
+private fun SinglePageEditor(
+    state: AddRecipeUiState,
+    vm: AddRecipeViewModel,
+    onSaved: (String) -> Unit,
+) {
+    val draft = state.draft
+    Column(Modifier.fillMaxSize()) {
         Column(
             Modifier
                 .weight(1f)
@@ -253,143 +265,3 @@ fun ManualRecipeScreen(
         }
     }
 }
-
-@Composable
-private fun SectionHeader(title: String, count: Int = 0, onAdd: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(top = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(
-            if (count > 0) "$title ($count)" else title,
-            color = Espresso,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 16.sp,
-        )
-        Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(20.dp))
-                .background(Clay)
-                .clickable(onClick = onAdd)
-                .padding(horizontal = 10.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(Icons.Outlined.Add, contentDescription = null, tint = Terracotta)
-            Text("Add", color = Terracotta, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-        }
-    }
-}
-
-@Composable
-private fun IngredientEditor(
-    item: DraftIngredient,
-    onChange: (DraftIngredient) -> Unit,
-    onDelete: () -> Unit,
-) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(Ivory)
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Row(
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    QuantityFormatter.ingredientLine(item, UnitSystem.US),
-                    color = Espresso,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                val usPresent = item.quantityUs > 0.0 || item.unitUs.isNotBlank()
-                val metricPresent = item.quantityMetric > 0.0 || item.unitMetric.isNotBlank()
-                if (usPresent && metricPresent) {
-                    Text(
-                        QuantityFormatter.ingredientLine(item, UnitSystem.METRIC),
-                        color = Taupe,
-                        fontSize = 13.sp,
-                    )
-                }
-            }
-            DeleteControl("Delete ingredient") { onDelete() }
-        }
-        Field("Name", item.name, compact = true) { onChange(item.copy(name = it)) }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(Modifier.weight(1f)) {
-                Field("US qty", item.quantityUs.toPlain(), keyboard = KeyboardType.Decimal, compact = true) {
-                    onChange(item.copy(quantityUs = it.toDoubleOrNull() ?: 0.0))
-                }
-            }
-            Box(Modifier.weight(1f)) {
-                Field("US unit", item.unitUs, compact = true) { onChange(item.copy(unitUs = it)) }
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(Modifier.weight(1f)) {
-                Field("Metric qty", item.quantityMetric.toPlain(), keyboard = KeyboardType.Decimal, compact = true) {
-                    onChange(item.copy(quantityMetric = it.toDoubleOrNull() ?: 0.0))
-                }
-            }
-            Box(Modifier.weight(1f)) {
-                Field("Metric unit", item.unitMetric, compact = true) { onChange(item.copy(unitMetric = it)) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DeleteControl(label: String, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .padding(top = 4.dp)
-            .size(36.dp)
-            .clip(CircleShape)
-            .background(Clay)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(Icons.Outlined.Delete, contentDescription = label, tint = Terracotta)
-    }
-}
-
-@Composable
-private fun Field(
-    label: String,
-    value: String,
-    keyboard: KeyboardType = KeyboardType.Text,
-    singleLine: Boolean = true,
-    compact: Boolean = false,
-    onChange: (String) -> Unit,
-) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onChange,
-        label = { Text(label) },
-        singleLine = singleLine,
-        modifier = Modifier.fillMaxWidth(),
-        keyboardOptions = KeyboardOptions(keyboardType = keyboard),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = Terracotta,
-            unfocusedBorderColor = Clay,
-            focusedLabelColor = Terracotta,
-            unfocusedLabelColor = Taupe,
-            focusedContainerColor = Ivory,
-            unfocusedContainerColor = Ivory,
-            focusedTextColor = Espresso,
-            unfocusedTextColor = Espresso,
-        ),
-        minLines = if (singleLine) 1 else 2,
-    )
-}
-
-private fun Double.toPlain(): String =
-    if (this == toLong().toDouble()) toLong().toString() else toString()
-
-private fun Int.toMinutesInput(): String = if (this > 0) toString() else ""
