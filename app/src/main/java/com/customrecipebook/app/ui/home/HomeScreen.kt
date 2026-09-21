@@ -1,5 +1,6 @@
 package com.customrecipebook.app.ui.home
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CameraAlt
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material3.CircularProgressIndicator
@@ -28,6 +30,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -64,44 +69,51 @@ fun HomeScreen(
 ) {
     val vm: HomeViewModel = viewModel(factory = app.container.factory)
     val state by vm.uiState.collectAsStateWithLifecycle()
+    var addOpen by remember { mutableStateOf(false) }
 
-    LazyColumn(
+    fun choose(source: ImportSource) {
+        addOpen = false
+        onAdd(source)
+    }
+
+    Column(
         modifier = modifier
             .fillMaxSize()
             .background(Sand),
-        contentPadding = PaddingValues(bottom = 28.dp),
     ) {
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                BrandMark(size = 42)
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "Custom",
-                        color = Espresso,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        lineHeight = 24.sp,
-                    )
-                    Text(
-                        "Recipebook",
-                        color = Espresso,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        lineHeight = 24.sp,
-                    )
-                }
-                CircleIconButton(onClick = { onAdd(null) }) {
-                    Icon(Icons.Outlined.Add, contentDescription = "Add recipe", tint = Espresso)
-                }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            BrandMark(size = 42)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Custom",
+                    color = Espresso,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    lineHeight = 24.sp,
+                )
+                Text(
+                    "Recipebook",
+                    color = Espresso,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    lineHeight = 24.sp,
+                )
+            }
+            CircleIconButton(onClick = { addOpen = !addOpen }) {
+                Icon(
+                    if (addOpen) Icons.Outlined.Close else Icons.Outlined.Add,
+                    contentDescription = if (addOpen) "Close add menu" else "Add recipe",
+                    tint = Espresso,
+                )
             }
         }
-        item {
+        AnimatedVisibility(visible = addOpen) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -112,55 +124,66 @@ fun HomeScreen(
                     label = "PDF",
                     icon = Icons.Outlined.PictureAsPdf,
                     modifier = Modifier.weight(1f),
-                    onClick = { onAdd(ImportSource.PDF) },
+                    onClick = { choose(ImportSource.PDF) },
                 )
                 ImportChip(
                     label = "Camera",
                     icon = Icons.Outlined.CameraAlt,
                     modifier = Modifier.weight(1f),
-                    onClick = { onAdd(ImportSource.CAMERA) },
+                    onClick = { choose(ImportSource.CAMERA) },
                 )
                 ImportChip(
                     label = "Manual",
                     icon = Icons.Outlined.Edit,
                     modifier = Modifier.weight(1f),
-                    onClick = { onAdd(ImportSource.MANUAL) },
+                    onClick = { choose(ImportSource.MANUAL) },
                 )
             }
         }
-        item {
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+        Box(Modifier.weight(1f)) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 28.dp),
             ) {
-                items(RecipeCategory.entries) { category ->
-                    SoftChip(
-                        text = category.label,
-                        selected = state.selectedCategory == category,
-                        onClick = { vm.selectCategory(category) },
-                    )
+                item {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(RecipeCategory.entries) { category ->
+                            SoftChip(
+                                text = category.label,
+                                selected = state.selectedCategory == category,
+                                onClick = { vm.selectCategory(category) },
+                            )
+                        }
+                    }
+                }
+                if (!state.loaded) {
+                    item {
+                        Box(Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = Terracotta, strokeWidth = 3.dp)
+                        }
+                    }
+                } else if (state.totalCount == 0) {
+                    item { EmptyLibrary() }
+                } else if (state.recipes.isEmpty()) {
+                    item { EmptyFilter(state.selectedCategory) }
+                } else {
+                    items(state.recipes, key = { it.id }) { recipe ->
+                        RecipeCard(
+                            recipe = recipe,
+                            onClick = { onOpenRecipe(recipe.id) },
+                        )
+                    }
                 }
             }
-        }
-        if (!state.loaded) {
-            item {
-                Box(Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Terracotta, strokeWidth = 3.dp)
-                }
-            }
-        } else if (state.totalCount == 0) {
-            item {
-                EmptyLibrary(onAdd = onAdd)
-            }
-        } else if (state.recipes.isEmpty()) {
-            item {
-                EmptyFilter(state.selectedCategory)
-            }
-        } else {
-            items(state.recipes, key = { it.id }) { recipe ->
-                RecipeCard(
-                    recipe = recipe,
-                    onClick = { onOpenRecipe(recipe.id) },
+            if (addOpen) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(Espresso.copy(alpha = 0.18f))
+                        .clickable { addOpen = false },
                 )
             }
         }
@@ -232,7 +255,7 @@ private fun RecipeCard(recipe: Recipe, onClick: () -> Unit) {
 }
 
 @Composable
-private fun EmptyLibrary(onAdd: (ImportSource?) -> Unit) {
+private fun EmptyLibrary() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -244,47 +267,11 @@ private fun EmptyLibrary(onAdd: (ImportSource?) -> Unit) {
         Text("Your book is empty", color = Espresso, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
         Spacer(Modifier.height(8.dp))
         Text(
-            "Nothing ships preloaded. Bring a recipe in with a PDF, a photo, or by typing it yourself.",
+            "Nothing ships preloaded. Tap + to add a PDF, a photo, or a recipe you type yourself.",
             color = Taupe,
             fontSize = 14.sp,
             lineHeight = 20.sp,
         )
-        Spacer(Modifier.height(16.dp))
-        EmptyAction("Upload a PDF", "Parse a saved recipe file", Icons.Outlined.PictureAsPdf) {
-            onAdd(ImportSource.PDF)
-        }
-        EmptyAction("Scan with camera", "Snap a page or pick a photo", Icons.Outlined.CameraAlt) {
-            onAdd(ImportSource.CAMERA)
-        }
-        EmptyAction("Enter manually", "Build it ingredient by ingredient", Icons.Outlined.Edit) {
-            onAdd(ImportSource.MANUAL)
-        }
-    }
-}
-
-@Composable
-private fun EmptyAction(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(Clay)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(icon, contentDescription = null, tint = Terracotta)
-        Spacer(Modifier.width(12.dp))
-        Column {
-            Text(title, color = Espresso, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-            Text(subtitle, color = Taupe, fontSize = 13.sp)
-        }
     }
 }
 
@@ -313,7 +300,7 @@ private fun EmptyFilter(category: RecipeCategory) {
         Text(
             when (category) {
                 RecipeCategory.SAVED -> "Open a recipe and tap the bookmark to keep it on this list."
-                else -> "Add a PDF, snap a page, or type a recipe to fill this shelf."
+                else -> "Tap + to add a PDF, snap a page, or type a recipe for this shelf."
             },
             color = Taupe,
             fontSize = 14.sp,

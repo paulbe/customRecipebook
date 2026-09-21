@@ -6,7 +6,7 @@ The book ships **empty**. Everything on Home comes from a PDF, a photo, or a rec
 
 ## What’s in v1
 
-- **Recipes home** — Custom Recipebook header, PDF / Camera / Manual chips, All · Dinner · Baking · Saved filters. Empty state nudges those three import paths.
+- **Recipes home** — Custom Recipebook header, All · Dinner · Baking · Saved filters. Tap **+** to reveal PDF / Camera / Manual. Empty state points at that plus button.
 - **Add recipe** — pick a PDF (`application/pdf` document picker), take or choose a photo, or enter a recipe manually.
 - **PDF import** — copies the file into app storage, reads a text layer when one exists, prefills title (from the filename or the first line), ingredients, and steps, then opens an editable Review form. If extract fails, the PDF is still attached and you fill the form.
 - **Recipe detail** — optional hero photo, US ↔ Metric toggle, servings + batch scale (− / N× / +), tappable ingredient checklist (`2 cups: all-purpose flour`), numbered directions. PDF recipes can reopen the attached file.
