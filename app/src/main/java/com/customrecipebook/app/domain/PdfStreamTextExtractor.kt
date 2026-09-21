@@ -184,6 +184,7 @@ object PdfStreamTextExtractor {
     private fun readLiteral(src: String, start: Int): Pair<String, Int> {
         val out = StringBuilder()
         var i = start + 1
+        var depth = 0
         while (i < src.length) {
             val c = src[i]
             when (c) {
@@ -212,7 +213,17 @@ object PdfStreamTextExtractor {
                     }
                     i += 2
                 }
-                ')' -> return out.toString() to (i + 1)
+                ')' -> {
+                    if (depth == 0) return out.toString() to (i + 1)
+                    depth--
+                    out.append(')')
+                    i++
+                }
+                '(' -> {
+                    depth++
+                    out.append('(')
+                    i++
+                }
                 else -> {
                     out.append(c)
                     i++

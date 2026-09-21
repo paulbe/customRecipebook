@@ -333,4 +333,130 @@ class RecipeTextParserTest {
         val text = PdfStreamTextExtractor.extract(pdf)
         assertTrue(text.contains("Chocolate Cake"))
     }
+
+    @Test
+    fun parenthesesDoNotCreateExtraIngredients() {
+        val parsed = RecipeTextParser.parse(
+            """
+            Soup
+            Ingredients
+            2 cups flour (sifted)
+            1 onion (diced)
+            1 tbsp oil
+            Directions
+            1. Mix.
+            """.trimIndent(),
+            "Fallback",
+        )
+        assertEquals(3, parsed.ingredients.size)
+        assertEquals("flour (sifted)", parsed.ingredients[0].name)
+        assertEquals("cups", parsed.ingredients[0].unitUs)
+        assertEquals(2.0, parsed.ingredients[0].quantityUs, 0.01)
+        assertEquals("onion (diced)", parsed.ingredients[1].name)
+        assertEquals(1.0, parsed.ingredients[1].quantityUs, 0.01)
+        assertEquals("oil", parsed.ingredients[2].name)
+        assertEquals(
+            "2 cups: flour (sifted)",
+            QuantityFormatter.ingredientLine(parsed.ingredients[0], UnitSystem.US),
+        )
+        assertEquals(
+            "1: onion (diced)",
+            QuantityFormatter.ingredientLine(parsed.ingredients[1], UnitSystem.US),
+        )
+    }
+
+    @Test
+    fun numberedCloseParenInsideNoteIsNotANewIngredient() {
+        val parsed = RecipeTextParser.parse(
+            """
+            Chili
+            Ingredients
+            1 onion (about 2 cups diced)
+            2 cloves garlic
+            Directions
+            1. Mix.
+            """.trimIndent(),
+            "Fallback",
+        )
+        assertEquals(2, parsed.ingredients.size)
+        assertEquals("onion (about 2 cups diced)", parsed.ingredients[0].name)
+        assertEquals("garlic", parsed.ingredients[1].name)
+        assertEquals("cloves", parsed.ingredients[1].unitUs)
+    }
+
+    @Test
+    fun qtyInsideParenthesesStaysOnTheSameIngredient() {
+        val parsed = RecipeTextParser.parse(
+            """
+            Cake
+            Ingredients
+            2 cups flour (or 1 cup almond flour)
+            1 tsp salt
+            Directions
+            1. Mix.
+            """.trimIndent(),
+            "Fallback",
+        )
+        assertEquals(2, parsed.ingredients.size)
+        assertEquals("flour (or 1 cup almond flour)", parsed.ingredients[0].name)
+        assertEquals("cups", parsed.ingredients[0].unitUs)
+        assertEquals("salt", parsed.ingredients[1].name)
+    }
+
+    @Test
+    fun wrappedParentheticalJoinsPreviousIngredient() {
+        val parsed = RecipeTextParser.parse(
+            """
+            Cake
+            Ingredients
+            2 cups flour
+            (sifted)
+            1 onion
+            (diced)
+            Directions
+            1. Mix.
+            """.trimIndent(),
+            "Fallback",
+        )
+        assertEquals(2, parsed.ingredients.size)
+        assertEquals("flour (sifted)", parsed.ingredients[0].name)
+        assertEquals("onion (diced)", parsed.ingredients[1].name)
+    }
+
+    @Test
+    fun separateNewlinesStaySeparateIngredients() {
+        val parsed = RecipeTextParser.parse(
+            """
+            Cake
+            Ingredients
+            2 cups flour
+            1 onion
+            Directions
+            1. Mix.
+            """.trimIndent(),
+            "Fallback",
+        )
+        assertEquals(2, parsed.ingredients.size)
+        assertEquals("flour", parsed.ingredients[0].name)
+        assertEquals("onion", parsed.ingredients[1].name)
+    }
+
+    @Test
+    fun nestedPdfStringKeepsParentheticalOnSameLine() {
+        val content = "BT /F1 12 Tf 10 100 Td (2 cups flour (sifted)) Tj ET"
+        val pdf = """
+            %PDF-1.1
+            1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
+            2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
+            3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Contents 4 0 R >> endobj
+            4 0 obj << /Length ${content.length} >> stream
+            $content
+            endstream
+            endobj
+            trailer << /Root 1 0 R >>
+            %%EOF
+        """.trimIndent().toByteArray(Charsets.ISO_8859_1)
+        val text = PdfStreamTextExtractor.extract(pdf)
+        assertEquals("2 cups flour (sifted)", text)
+    }
 }

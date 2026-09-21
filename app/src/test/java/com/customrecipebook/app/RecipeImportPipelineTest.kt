@@ -112,7 +112,10 @@ class RecipeImportPipelineTest {
         """.trimIndent()
         val parsed = RecipeTextParser.parse(text, "chili.pdf")
         assertEquals("Chili", parsed.title)
-        assertTrue(parsed.ingredients.size >= 2)
+        assertEquals(2, parsed.ingredients.size)
+        assertEquals("ground beef", parsed.ingredients[0].name)
+        assertEquals("tomatoes", parsed.ingredients[1].name)
+        assertTrue(parsed.ingredients.none { it.name.contains("serves", ignoreCase = true) })
         assertTrue(parsed.directions.size >= 2)
     }
 

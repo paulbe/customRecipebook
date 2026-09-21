@@ -107,8 +107,8 @@ object RecipeTextParser {
             "\n$1\n",
         )
         text = stripDualMetric(text)
-        text = text.replace(stepSplit, "\n")
-        text = text.replace(qtySplit, "\n")
+        text = replaceOutsideParens(text, stepSplit)
+        text = splitGluedQuantities(text)
         return text
     }
 
@@ -136,6 +136,32 @@ object RecipeTextParser {
         return t
     }
 
+    private fun splitGluedQuantities(text: String): String = replaceOutsideParens(text, qtySplit)
+
+    private fun replaceOutsideParens(text: String, pattern: Regex): String {
+        val matches = pattern.findAll(text).toList()
+        if (matches.isEmpty()) return text
+        val insideParen = BooleanArray(text.length)
+        var depth = 0
+        for (i in text.indices) {
+            when (text[i]) {
+                '(' -> depth++
+                ')' -> if (depth > 0) depth--
+            }
+            insideParen[i] = depth > 0
+        }
+        val out = StringBuilder()
+        var last = 0
+        for (match in matches) {
+            if (insideParen.getOrElse(match.range.first) { false }) continue
+            out.append(text, last, match.range.first)
+            out.append('\n')
+            last = match.range.last + 1
+        }
+        out.append(text, last, text.length)
+        return out.toString()
+    }
+
     fun parse(raw: String, fallbackTitle: String): ParsedRecipeText {
         val normalized = normalize(raw)
         val lines = normalized.lines().map { it.trim() }.filter { it.isNotBlank() }
@@ -157,7 +183,18 @@ object RecipeTextParser {
 
         fun consume(target: Section, text: String) {
             when (target) {
-                Section.INGREDIENTS -> ingredients += parseIngredientLine(text)
+                Section.INGREDIENTS -> {
+                    val trimmed = text.trim()
+                    if (ingredients.isNotEmpty() && isParentheticalLine(trimmed)) {
+                        val prev = ingredients.last()
+                        val note = trimmed.replace(Regex("^[-•*–]\\s*"), "").trim()
+                        ingredients[ingredients.lastIndex] = prev.copy(
+                            name = "${prev.name} $note".trim(),
+                        )
+                    } else {
+                        ingredients += parseIngredientLine(text)
+                    }
+                }
                 Section.DIRECTIONS -> addDirectionLine(text, directions)
                 Section.NOTES -> {
                     if (notes.isNotEmpty()) notes.append('\n')
@@ -171,7 +208,8 @@ object RecipeTextParser {
             val matched = matchHeader(line)
             if (matched != null) {
                 section = matched.first
-                if (matched.second.isNotBlank()) consume(section, matched.second)
+                val rest = matched.second
+                if (rest.isNotBlank() && !isParentheticalLine(rest)) consume(section, rest)
                 continue
             }
             consume(section, line)
@@ -317,6 +355,19 @@ object RecipeTextParser {
             qtyUnitColonLine.containsMatchIn(cleaned) ||
             formattedLine.containsMatchIn(cleaned) ||
             qtyPattern.containsMatchIn(cleaned)
+    }
+
+    private fun isParentheticalLine(line: String): Boolean {
+        val trimmed = line.trim().replace(Regex("^[-•*–]\\s*"), "").trim()
+        if (!trimmed.startsWith("(")) return false
+        var depth = 0
+        for (c in trimmed) {
+            when (c) {
+                '(' -> depth++
+                ')' -> if (depth > 0) depth--
+            }
+        }
+        return depth == 0 && trimmed.endsWith(")")
     }
 
     private fun headerKind(line: String): Section? = matchHeader(line)?.first
