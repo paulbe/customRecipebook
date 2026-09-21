@@ -155,6 +155,35 @@ class RecipeTextParserTest {
     }
 
     @Test
+    fun gluedNotesAfterLastStepBecomesNotesField() {
+        val parsed = RecipeTextParser.parse(
+            "Cookies Ingredients 2 cups flour Directions 1. Mix the dough. 2. Bake 12 min. Notes Dough keeps 3 days in the fridge.",
+            "Fallback",
+        )
+        assertEquals(listOf("Mix the dough.", "Bake 12 min."), parsed.directions)
+        assertEquals("Dough keeps 3 days in the fridge.", parsed.notes)
+    }
+
+    @Test
+    fun tipsHeadingIsNotesWhenItFollowsAFinishedStep() {
+        val parsed = RecipeTextParser.parse(
+            """
+            Cookies
+            Ingredients
+            2 cups flour
+            Directions
+            1. Mix the dough.
+            2. Bake 12 min.
+            Tips
+            Chill the dough overnight.
+            """.trimIndent(),
+            "Fallback",
+        )
+        assertEquals(listOf("Mix the dough.", "Bake 12 min."), parsed.directions)
+        assertEquals("Chill the dough overnight.", parsed.notes)
+    }
+
+    @Test
     fun noteTheColorStaysADirection() {
         val parsed = RecipeTextParser.parse(
             """
@@ -169,6 +198,20 @@ class RecipeTextParserTest {
         )
         assertEquals(listOf("Note the color of the crust.", "Cool on a rack."), parsed.directions)
         assertEquals("", parsed.notes)
+
+        val colon = RecipeTextParser.parse(
+            """
+            Cake
+            Ingredients
+            1 cup sugar
+            Directions
+            1. Note: the color of the crust.
+            2. Cool on a rack.
+            """.trimIndent(),
+            "Fallback",
+        )
+        assertEquals(listOf("Note: the color of the crust.", "Cool on a rack."), colon.directions)
+        assertEquals("", colon.notes)
     }
 
     @Test

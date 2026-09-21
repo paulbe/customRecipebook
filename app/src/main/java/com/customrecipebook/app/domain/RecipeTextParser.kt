@@ -20,7 +20,6 @@ object RecipeTextParser {
         "shopping list", "what you need", "for the dough", "for the sauce",
         "for the filling",
     )
-    private val notesHeaderExact = setOf("notes", "note", "tips", "tip")
     private val notesHeaderPrefixes = listOf(
         "cook's notes", "cooks notes", "chef's notes", "chefs notes",
         "cooking notes", "baker's notes", "bakers notes", "recipe notes",
@@ -66,7 +65,10 @@ object RecipeTextParser {
         """^(?:(?i:step)\s+\d+\s*[:.\-)]*\s*|\d+[.)]\s*|\d{1,2}\s+(?=[A-Z][a-z]{2,}))""",
     )
     private val headerSplit = Regex(
-        """(?i)(?<=\S)\s*(?=\b(?:ingredients?|directions?|instructions?|method|steps|preparation|cook'?s notes|chef'?s notes)\b|(?<![sS] )notes\b)""",
+        """(?i)(?<=\S)\s*(?=\b(?:ingredients?|directions?|instructions?|method|steps|preparation|cook'?s notes|chef'?s notes|baker'?s notes|cooking notes|recipe notes)\b|(?<!\d[.)]\s)(?<![sS] )notes\b)""",
+    )
+    private val tipsHeaderSplit = Regex(
+        """(?i)(?<=[A-Za-z][.!?])\s+(?=tips?\b)""",
     )
     private val stepSplit = Regex(
         """(?<=\S)\s+(?=(?:(?i:step)\s+\d+\s*[:.\-)]*|\d+[.)]\s*))""",
@@ -92,7 +94,13 @@ object RecipeTextParser {
     fun normalize(raw: String): String {
         var text = raw.replace("\r\n", "\n").replace('\r', '\n')
         text = text.replace(headerSplit, "\n")
-        text = text.replace(Regex("""(?i)\b(ingredients?|directions?|instructions?|method|steps|preparation|notes?|cook'?s notes|chef'?s notes|tips)\s*:"""), "\n$1\n")
+        text = text.replace(tipsHeaderSplit, "\n")
+        text = text.replace(
+            Regex(
+                """(?i)(?<!\d[.)]\s)\b(ingredients?|directions?|instructions?|method|steps|preparation|cook'?s notes|chef'?s notes|baker'?s notes|cooking notes|recipe notes|notes?|tips)\s*:""",
+            ),
+            "\n$1\n",
+        )
         text = text.replace(stepSplit, "\n")
         text = text.replace(qtySplit, "\n")
         return text
@@ -117,21 +125,26 @@ object RecipeTextParser {
         val notes = StringBuilder()
         var section = Section.UNKNOWN
 
-        for (line in lines.drop(start)) {
-            val header = headerKind(line)
-            if (header != null) {
-                section = header
-                continue
-            }
-            when (section) {
-                Section.INGREDIENTS -> ingredients += parseIngredientLine(line)
-                Section.DIRECTIONS -> addDirectionLine(line, directions)
+        fun consume(target: Section, text: String) {
+            when (target) {
+                Section.INGREDIENTS -> ingredients += parseIngredientLine(text)
+                Section.DIRECTIONS -> addDirectionLine(text, directions)
                 Section.NOTES -> {
                     if (notes.isNotEmpty()) notes.append('\n')
-                    notes.append(line)
+                    notes.append(text)
                 }
-                Section.UNKNOWN -> classifyUnknown(line, ingredients, directions)
+                Section.UNKNOWN -> classifyUnknown(text, ingredients, directions)
             }
+        }
+
+        for (line in lines.drop(start)) {
+            val matched = matchHeader(line)
+            if (matched != null) {
+                section = matched.first
+                if (matched.second.isNotBlank()) consume(section, matched.second)
+                continue
+            }
+            consume(section, line)
         }
 
         if (ingredients.isEmpty() && directions.isEmpty() && notes.isEmpty() && lines.size > start) {
@@ -276,25 +289,37 @@ object RecipeTextParser {
             qtyPattern.containsMatchIn(cleaned)
     }
 
-    private fun headerKind(line: String): Section? {
-        val key = line.lowercase().trim().trimEnd(':').trim()
-            .replace('’', '\'')
-            .replace('`', '\'')
-        if (ingredientHeaderWords.any { key == it || key.startsWith("$it ") || key.startsWith("$it(") }) {
-            return Section.INGREDIENTS
+    private fun headerKind(line: String): Section? = matchHeader(line)?.first
+
+    private fun matchHeader(line: String): Pair<Section, String>? {
+        val raw = line.trim().replace('’', '\'').replace('`', '\'')
+        if (raw.isEmpty()) return null
+        val key = raw.lowercase().trimEnd(':').trim()
+
+        fun remainder(prefix: String): String {
+            val pattern = Regex("^${Regex.escape(prefix)}\\s*:?\\s*", RegexOption.IGNORE_CASE)
+            return pattern.replaceFirst(raw, "").trim().trimStart(':', '-', '—', '–').trim()
         }
-        if (isNotesHeader(key)) {
-            return Section.NOTES
+
+        fun startsWithHeading(heading: String): Boolean =
+            key == heading || key.startsWith("$heading ") || key.startsWith("$heading(") || key.startsWith("$heading:")
+
+        for (word in ingredientHeaderWords) {
+            if (startsWithHeading(word)) return Section.INGREDIENTS to remainder(word)
         }
-        if (directionHeaderWords.any { key == it || key.startsWith("$it ") || key.startsWith("$it(") }) {
-            return Section.DIRECTIONS
+        for (prefix in notesHeaderPrefixes) {
+            if (startsWithHeading(prefix)) return Section.NOTES to remainder(prefix)
+        }
+        when {
+            startsWithHeading("notes") -> return Section.NOTES to remainder("notes")
+            key == "note" || key.startsWith("note:") -> return Section.NOTES to remainder("note")
+            startsWithHeading("tips") -> return Section.NOTES to remainder("tips")
+            key == "tip" || key.startsWith("tip:") -> return Section.NOTES to remainder("tip")
+        }
+        for (word in directionHeaderWords) {
+            if (startsWithHeading(word)) return Section.DIRECTIONS to remainder(word)
         }
         return null
-    }
-
-    private fun isNotesHeader(key: String): Boolean {
-        if (key in notesHeaderExact) return true
-        return notesHeaderPrefixes.any { key == it || key.startsWith("$it ") || key.startsWith("$it(") }
     }
 
     private fun addDirectionLine(line: String, directions: MutableList<String>) {

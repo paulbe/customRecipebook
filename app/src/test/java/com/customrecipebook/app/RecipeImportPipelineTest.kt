@@ -43,6 +43,26 @@ class RecipeImportPipelineTest {
         assertEquals("", draft.subtitle)
         assertEquals("servings", draft.servingsUnit)
         assertEquals("Easy", draft.difficulty)
+        assertEquals("", draft.notes)
+    }
+
+    @Test
+    fun notesBlockIsCopiedToDraftNotDirections() {
+        val text = """
+            Chocolate Chip Cookies
+            Ingredients
+            2 cups all-purpose flour
+            Directions
+            1. Preheat oven to 350°F.
+            2. Beat butter and sugars.
+            Notes
+            Dough keeps 3 days refrigerated.
+        """.trimIndent()
+        val parsed = RecipeTextParser.parse(text, "cookies.pdf")
+        val draft = RecipeTextParser.toDraft(parsed, "cookies.pdf", null)
+        assertEquals(listOf("Preheat oven to 350°F.", "Beat butter and sugars."), draft.directions)
+        assertEquals("Dough keeps 3 days refrigerated.", draft.notes)
+        assertTrue(draft.parseMessage.contains("and notes"))
     }
 
     @Test
