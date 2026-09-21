@@ -52,5 +52,6 @@ class RecipeDraftMappingTest {
         assertEquals("cups", draft.ingredients.single().unitUs)
         assertEquals(listOf("Simmer."), draft.directions)
         assertEquals(ImportSource.PDF, draft.source)
+        assertEquals("", draft.notes)
     }
 }

@@ -204,6 +204,13 @@ fun ManualRecipeScreen(
                     }
                 }
             }
+            Field(
+                "Notes",
+                draft.notes,
+                singleLine = false,
+            ) { value ->
+                vm.updateDraft { it.copy(notes = value) }
+            }
             Spacer(Modifier.height(12.dp))
         }
 

@@ -44,6 +44,7 @@ data class Recipe(
     val imageUri: String?,
     val attachmentUri: String? = null,
     val attachmentName: String? = null,
+    val notes: String = "",
     val isSaved: Boolean,
     val source: ImportSource,
     val createdAt: Long,
@@ -68,6 +69,7 @@ data class RecipeDraft(
     val imageUri: String? = null,
     val attachmentUri: String? = null,
     val attachmentName: String? = null,
+    val notes: String = "",
     val ingredients: List<DraftIngredient> = emptyList(),
     val directions: List<String> = emptyList(),
     val parseMessage: String = "",
@@ -88,6 +90,7 @@ fun Recipe.toDraft(): RecipeDraft = RecipeDraft(
     imageUri = imageUri,
     attachmentUri = attachmentUri,
     attachmentName = attachmentName,
+    notes = notes,
     ingredients = ingredients.map {
         DraftIngredient(
             name = it.name,

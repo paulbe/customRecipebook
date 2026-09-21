@@ -162,6 +162,12 @@ fun RecipeDetailScreen(
                 }
             }
             Spacer(Modifier.height(24.dp))
+            if (recipe.notes.isNotBlank()) {
+                Text("NOTES", color = Taupe, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
+                Spacer(Modifier.height(10.dp))
+                Text(recipe.notes, color = Espresso, fontSize = 16.sp, lineHeight = 23.sp)
+                Spacer(Modifier.height(24.dp))
+            }
         }
     }
 }

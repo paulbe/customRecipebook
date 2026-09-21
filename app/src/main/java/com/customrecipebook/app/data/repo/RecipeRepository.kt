@@ -73,6 +73,7 @@ class RecipeRepository(private val db: AppDatabase) {
             imageUri = draft.imageUri ?: existing?.imageUri,
             attachmentUri = draft.attachmentUri ?: existing?.attachmentUri,
             attachmentName = draft.attachmentName ?: existing?.attachmentName,
+            notes = draft.notes,
             isSaved = existing?.isSaved ?: false,
             source = draft.source.name,
             createdAt = existing?.createdAt ?: now,

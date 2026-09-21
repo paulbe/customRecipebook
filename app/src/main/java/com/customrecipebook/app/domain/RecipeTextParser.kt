@@ -9,6 +9,7 @@ data class ParsedRecipeText(
     val subtitle: String,
     val ingredients: List<DraftIngredient>,
     val directions: List<String>,
+    val notes: String = "",
     val extracted: Boolean,
     val sourceText: String = "",
 )
@@ -18,6 +19,13 @@ object RecipeTextParser {
         "ingredients", "ingredient list", "ingredient", "you will need",
         "shopping list", "what you need", "for the dough", "for the sauce",
         "for the filling",
+    )
+    private val notesHeaderExact = setOf("notes", "note", "tips", "tip")
+    private val notesHeaderPrefixes = listOf(
+        "cook's notes", "cooks notes", "chef's notes", "chefs notes",
+        "cooking notes", "baker's notes", "bakers notes", "recipe notes",
+        "cook's tip", "cook's tips", "chef's tip", "chef's tips",
+        "baker's tips", "bakers tips",
     )
     private val directionHeaderWords = listOf(
         "directions", "direction", "instructions", "instruction",
@@ -58,7 +66,7 @@ object RecipeTextParser {
         """^(?:(?i:step)\s+\d+\s*[:.\-)]*\s*|\d+[.)]\s*|\d{1,2}\s+(?=[A-Z][a-z]{2,}))""",
     )
     private val headerSplit = Regex(
-        """(?i)(?<=\S)\s*(?=\b(?:ingredients?|directions?|instructions?|method|steps|preparation)\b)""",
+        """(?i)(?<=\S)\s*(?=\b(?:ingredients?|directions?|instructions?|method|steps|preparation|cook'?s notes|chef'?s notes)\b|(?<![sS] )notes\b)""",
     )
     private val stepSplit = Regex(
         """(?<=\S)\s+(?=(?:(?i:step)\s+\d+\s*[:.\-)]*|\d+[.)]\s*))""",
@@ -84,7 +92,7 @@ object RecipeTextParser {
     fun normalize(raw: String): String {
         var text = raw.replace("\r\n", "\n").replace('\r', '\n')
         text = text.replace(headerSplit, "\n")
-        text = text.replace(Regex("""(?i)\b(ingredients?|directions?|instructions?|method|steps|preparation)\s*:"""), "\n$1\n")
+        text = text.replace(Regex("""(?i)\b(ingredients?|directions?|instructions?|method|steps|preparation|notes?|cook'?s notes|chef'?s notes|tips)\s*:"""), "\n$1\n")
         text = text.replace(stepSplit, "\n")
         text = text.replace(qtySplit, "\n")
         return text
@@ -94,7 +102,7 @@ object RecipeTextParser {
         val normalized = normalize(raw)
         val lines = normalized.lines().map { it.trim() }.filter { it.isNotBlank() }
         if (lines.isEmpty()) {
-            return ParsedRecipeText(fallbackTitle, "", emptyList(), emptyList(), extracted = false, sourceText = raw)
+            return ParsedRecipeText(fallbackTitle, "", emptyList(), emptyList(), notes = "", extracted = false, sourceText = raw)
         }
 
         var title = fallbackTitle
@@ -106,6 +114,7 @@ object RecipeTextParser {
 
         val ingredients = mutableListOf<DraftIngredient>()
         val directions = mutableListOf<String>()
+        val notes = StringBuilder()
         var section = Section.UNKNOWN
 
         for (line in lines.drop(start)) {
@@ -117,20 +126,24 @@ object RecipeTextParser {
             when (section) {
                 Section.INGREDIENTS -> ingredients += parseIngredientLine(line)
                 Section.DIRECTIONS -> addDirectionLine(line, directions)
+                Section.NOTES -> {
+                    if (notes.isNotEmpty()) notes.append('\n')
+                    notes.append(line)
+                }
                 Section.UNKNOWN -> classifyUnknown(line, ingredients, directions)
             }
         }
 
-        if (ingredients.isEmpty() && directions.isEmpty() && lines.size > start) {
+        if (ingredients.isEmpty() && directions.isEmpty() && notes.isEmpty() && lines.size > start) {
             for (line in lines.drop(start)) {
                 classifyUnknown(line, ingredients, directions)
             }
         }
-        if (ingredients.isEmpty() && directions.isEmpty() && lines.size > start) {
+        if (ingredients.isEmpty() && directions.isEmpty() && notes.isEmpty() && lines.size > start) {
             directions += lines.drop(start)
         }
 
-        val extracted = ingredients.isNotEmpty() || directions.isNotEmpty()
+        val extracted = ingredients.isNotEmpty() || directions.isNotEmpty() || notes.isNotEmpty()
         val subtitle = when {
             extracted && ingredients.isNotEmpty() ->
                 ingredients.take(3).joinToString(" · ") { it.name.substringBefore(",") }
@@ -142,6 +155,7 @@ object RecipeTextParser {
             subtitle = subtitle,
             ingredients = ingredients,
             directions = directions,
+            notes = notes.toString().trim(),
             extracted = extracted,
             sourceText = raw.trim(),
         )
@@ -153,7 +167,8 @@ object RecipeTextParser {
         attachmentPath: String?,
     ): RecipeDraft {
         val message = if (parsed.extracted) {
-            "Filled ${parsed.ingredients.size} ingredients and ${parsed.directions.size} steps from $fileName. Edit anything that looks off, then save."
+            val notesBit = if (parsed.notes.isNotBlank()) " and notes" else ""
+            "Filled ${parsed.ingredients.size} ingredients and ${parsed.directions.size} steps$notesBit from $fileName. Edit anything that looks off, then save."
         } else {
             "Couldn't read text from this PDF. The file is attached — add ingredients and steps below."
         }
@@ -164,6 +179,7 @@ object RecipeTextParser {
             imageUri = null,
             attachmentUri = attachmentPath,
             attachmentName = fileName,
+            notes = parsed.notes,
             ingredients = parsed.ingredients,
             directions = parsed.directions,
             parseMessage = message,
@@ -262,13 +278,23 @@ object RecipeTextParser {
 
     private fun headerKind(line: String): Section? {
         val key = line.lowercase().trim().trimEnd(':').trim()
+            .replace('’', '\'')
+            .replace('`', '\'')
         if (ingredientHeaderWords.any { key == it || key.startsWith("$it ") || key.startsWith("$it(") }) {
             return Section.INGREDIENTS
+        }
+        if (isNotesHeader(key)) {
+            return Section.NOTES
         }
         if (directionHeaderWords.any { key == it || key.startsWith("$it ") || key.startsWith("$it(") }) {
             return Section.DIRECTIONS
         }
         return null
+    }
+
+    private fun isNotesHeader(key: String): Boolean {
+        if (key in notesHeaderExact) return true
+        return notesHeaderPrefixes.any { key == it || key.startsWith("$it ") || key.startsWith("$it(") }
     }
 
     private fun addDirectionLine(line: String, directions: MutableList<String>) {
@@ -376,5 +402,5 @@ object RecipeTextParser {
         else -> unit.lowercase()
     }
 
-    private enum class Section { UNKNOWN, INGREDIENTS, DIRECTIONS }
+    private enum class Section { UNKNOWN, INGREDIENTS, DIRECTIONS, NOTES }
 }

@@ -110,6 +110,68 @@ class RecipeTextParserTest {
     }
 
     @Test
+    fun notesSectionIsNotFoldedIntoDirections() {
+        val parsed = RecipeTextParser.parse(
+            """
+            Cookies
+            Ingredients
+            2 cups flour
+            Directions
+            1. Mix the dough.
+            2. Bake 12 min.
+            Notes
+            Dough keeps 3 days in the fridge.
+            Freeze baked cookies in a tin.
+            """.trimIndent(),
+            "Fallback",
+        )
+        assertEquals(listOf("Mix the dough.", "Bake 12 min."), parsed.directions)
+        assertEquals(
+            "Dough keeps 3 days in the fridge.\nFreeze baked cookies in a tin.",
+            parsed.notes,
+        )
+        assertEquals("flour", parsed.ingredients.single().name)
+        val draft = RecipeTextParser.toDraft(parsed, "cookies.pdf", null)
+        assertEquals(parsed.notes, draft.notes)
+        assertTrue(draft.directions.none { it.contains("keeps 3 days") })
+    }
+
+    @Test
+    fun chefsNotesHeadingFillsNotesField() {
+        val parsed = RecipeTextParser.parse(
+            """
+            Roast
+            Ingredients
+            1 lb beef
+            Method
+            1. Sear the meat.
+            Chef's notes
+            Rest 10 minutes before slicing.
+            """.trimIndent(),
+            "Fallback",
+        )
+        assertEquals(listOf("Sear the meat."), parsed.directions)
+        assertEquals("Rest 10 minutes before slicing.", parsed.notes)
+    }
+
+    @Test
+    fun noteTheColorStaysADirection() {
+        val parsed = RecipeTextParser.parse(
+            """
+            Cake
+            Ingredients
+            1 cup sugar
+            Directions
+            1. Note the color of the crust.
+            2. Cool on a rack.
+            """.trimIndent(),
+            "Fallback",
+        )
+        assertEquals(listOf("Note the color of the crust.", "Cool on a rack."), parsed.directions)
+        assertEquals("", parsed.notes)
+    }
+
+    @Test
     fun parseIngredientLineSplitsQtyUnitName() {
         val flour = RecipeTextParser.parseIngredientLine("2 cups all-purpose flour")
         assertEquals("all-purpose flour", flour.name)
