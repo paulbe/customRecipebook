@@ -8,7 +8,6 @@ import com.customrecipebook.app.data.RecipeDraft
 import com.customrecipebook.app.data.importing.RecipeImporter
 import com.customrecipebook.app.data.repo.RecipeRepository
 import com.customrecipebook.app.data.toDraft
-import com.customrecipebook.app.domain.IngredientNotesBoundary
 import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -82,17 +81,6 @@ class AddRecipeViewModel(
 
     fun updateDraft(transform: (RecipeDraft) -> RecipeDraft) {
         _state.update { it.copy(draft = transform(it.draft)) }
-    }
-
-    fun setIngredientNotesCut(cutAfter: Int) {
-        updateDraft { draft ->
-            val (ingredients, notes) = IngredientNotesBoundary.applyCut(
-                draft.ingredients,
-                draft.notes,
-                cutAfter,
-            )
-            draft.copy(ingredients = ingredients, notes = notes)
-        }
     }
 
     fun save(onSaved: (String) -> Unit) {

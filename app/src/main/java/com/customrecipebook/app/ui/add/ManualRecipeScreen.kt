@@ -54,8 +54,6 @@ fun ManualRecipeScreen(
     val activity = LocalContext.current as ComponentActivity
     val vm: AddRecipeViewModel = viewModel(activity, factory = app.container.factory)
     val state by vm.state.collectAsStateWithLifecycle()
-    val draft = state.draft
-    val pdfImport = draft.source == ImportSource.PDF && state.editingRecipeId == null
 
     Column(
         Modifier
@@ -72,24 +70,14 @@ fun ManualRecipeScreen(
             BackCircle(onClick = onBack)
             Spacer(Modifier.width(12.dp))
             Text(
-                when {
-                    state.editingRecipeId != null -> "Edit recipe"
-                    pdfImport -> "Review PDF"
-                    else -> "Recipe details"
-                },
+                if (state.editingRecipeId != null) "Edit recipe" else "Recipe details",
                 color = Espresso,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.SemiBold,
             )
         }
 
-        if (pdfImport) {
-            Box(Modifier.padding(horizontal = 20.dp).weight(1f)) {
-                PdfImportWizard(draft = draft, vm = vm, onSaved = onSaved)
-            }
-        } else {
-            SinglePageEditor(state = state, vm = vm, onSaved = onSaved)
-        }
+        SinglePageEditor(state = state, vm = vm, onSaved = onSaved)
     }
 }
 
