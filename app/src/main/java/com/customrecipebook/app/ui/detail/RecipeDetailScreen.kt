@@ -115,6 +115,15 @@ fun RecipeDetailScreen(
             }
             Spacer(Modifier.height(18.dp))
             UnitToggle(state.unitSystem, vm::setUnitSystem)
+            if (state.unitSystem == UnitSystem.METRIC) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Cups and spoons shown as grams using typical weights (~ means approximate).",
+                    color = Taupe,
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                )
+            }
             Spacer(Modifier.height(12.dp))
             ScaleRow(recipe = recipe, scale = state.scale, onBump = vm::bumpScale)
             Spacer(Modifier.height(22.dp))
@@ -287,7 +296,7 @@ private fun UnitToggle(system: UnitSystem, onChange: (UnitSystem) -> Unit) {
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = if (option == UnitSystem.US) "US" else "Metric",
+                    text = if (option == UnitSystem.US) "US" else "Grams",
                     color = if (selected) Color.White else Taupe,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 15.sp,

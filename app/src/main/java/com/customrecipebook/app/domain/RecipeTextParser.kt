@@ -43,6 +43,11 @@ object RecipeTextParser {
         "g", "kg", "ml", "l", "grams", "gram", "milliliters", "millilitre", "liters", "litre",
     )
     private val unitPattern = units.joinToString("|") { Regex.escape(it) }
+    private val householdUnitPattern = units
+        .filter { it.lowercase() !in metricUnits }
+        .joinToString("|") { Regex.escape(it) }
+    private val metricUnitToken =
+        """(?:kilograms?|milliliters?|millilitres?|liters?|litres?|grams?|kg|ml|g|l)"""
     private val qtyToken = """(?:\d+\s+\d+/\d+|\d+/\d+|\d+(?:\.\d+)?|[¼½¾⅓⅔])"""
     private val formattedParenLine = Regex(
         """^($qtyToken)?:\s*\(([^)]*)\)\s*\((.+)\)\s*$""",
@@ -101,9 +106,34 @@ object RecipeTextParser {
             ),
             "\n$1\n",
         )
+        text = stripDualMetric(text)
         text = text.replace(stepSplit, "\n")
         text = text.replace(qtySplit, "\n")
         return text
+    }
+
+    internal fun stripDualMetric(text: String): String {
+        if (text.isBlank()) return text
+        var t = text
+        val qty = qtyToken
+        val metric = metricUnitToken
+        val household = householdUnitPattern
+        t = t.replace(
+            Regex("""(?i)$qty\s*$metric\s*\(\s*($qty)\s+($household)\s*\)"""),
+            "$1 $2",
+        )
+        t = t.replace(
+            Regex("""(?i)$qty\s*$metric\s*(?:/|or)\s*($qty)\s+($household)\b"""),
+            "$1 $2",
+        )
+        t = t.replace(
+            Regex("""(?i)($qty\s+$household)\s+$qty\s*$metric\b"""),
+            "$1",
+        )
+        t = t.replace(Regex("""(?i)\(\s*$qty\s*$metric\s*\)"""), "")
+        t = t.replace(Regex("""(?i)\s*(?:/|or)\s*$qty\s*$metric\b"""), "")
+        t = t.replace(Regex("""[ \t]{2,}"""), " ")
+        return t
     }
 
     fun parse(raw: String, fallbackTitle: String): ParsedRecipeText {
@@ -203,7 +233,7 @@ object RecipeTextParser {
     }
 
     fun parseIngredientLine(line: String): DraftIngredient {
-        val cleaned = line.replace(Regex("^[-•*–]\\s*"), "").trim()
+        val cleaned = stripDualMetric(line.replace(Regex("^[-•*–]\\s*"), "")).trim()
         val paren = formattedParenLine.find(cleaned)
         if (paren != null) {
             val qtyRaw = paren.groupValues[1]

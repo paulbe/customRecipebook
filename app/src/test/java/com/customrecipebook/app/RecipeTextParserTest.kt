@@ -1,6 +1,8 @@
 package com.customrecipebook.app
 
+import com.customrecipebook.app.data.UnitSystem
 import com.customrecipebook.app.domain.PdfStreamTextExtractor
+import com.customrecipebook.app.domain.QuantityFormatter
 import com.customrecipebook.app.domain.RecipeTextParser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -215,7 +217,36 @@ class RecipeTextParserTest {
     }
 
     @Test
-    fun parseIngredientLineSplitsQtyUnitName() {
+    fun parseIngredientLineDropsDualMetricWhenHouseholdUnitPresent() {
+        val flour = RecipeTextParser.parseIngredientLine("2 cups (250g) flour")
+        assertEquals("flour", flour.name)
+        assertEquals(2.0, flour.quantityUs, 0.01)
+        assertEquals("cups", flour.unitUs)
+        assertEquals(0.0, flour.quantityMetric, 0.01)
+        assertEquals("", flour.unitMetric)
+        assertEquals(
+            "2 cups: flour",
+            QuantityFormatter.ingredientLine(flour, UnitSystem.US),
+        )
+
+        val oil = RecipeTextParser.parseIngredientLine("1 tbsp / 15 ml oil")
+        assertEquals("oil", oil.name)
+        assertEquals(1.0, oil.quantityUs, 0.01)
+        assertEquals("tbsp", oil.unitUs)
+        assertEquals(0.0, oil.quantityMetric, 0.01)
+        assertEquals("", oil.unitMetric)
+        assertEquals("1 tbsp: oil", QuantityFormatter.ingredientLine(oil, UnitSystem.US))
+
+        val sugar = RecipeTextParser.parseIngredientLine("250g (1 cup) sugar")
+        assertEquals("sugar", sugar.name)
+        assertEquals(1.0, sugar.quantityUs, 0.01)
+        assertEquals("cup", sugar.unitUs)
+        assertEquals(0.0, sugar.quantityMetric, 0.01)
+        assertEquals("", sugar.unitMetric)
+    }
+
+    @Test
+    fun parseIngredientLineKeepsMetricOnly() {
         val flour = RecipeTextParser.parseIngredientLine("2 cups all-purpose flour")
         assertEquals("all-purpose flour", flour.name)
         assertEquals(2.0, flour.quantityUs, 0.01)

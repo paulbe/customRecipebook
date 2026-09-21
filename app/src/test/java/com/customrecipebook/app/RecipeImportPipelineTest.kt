@@ -47,6 +47,29 @@ class RecipeImportPipelineTest {
     }
 
     @Test
+    fun dualMetricOnIngredientLinesIsDroppedAndNotSplit() {
+        val text = """
+            Cookies
+            Ingredients
+            2 cups (250g) flour
+            1 tbsp / 15 ml oil
+            226 g unsalted butter
+            Directions
+            1. Mix.
+        """.trimIndent()
+        val parsed = RecipeTextParser.parse(text, "cookies.pdf")
+        val draft = RecipeTextParser.toDraft(parsed, "cookies.pdf", null)
+        assertEquals(3, draft.ingredients.size)
+        assertEquals("2 cups: flour", QuantityFormatter.ingredientLine(draft.ingredients[0], UnitSystem.US))
+        assertEquals("1 tbsp: oil", QuantityFormatter.ingredientLine(draft.ingredients[1], UnitSystem.US))
+        assertEquals("226 g: unsalted butter", QuantityFormatter.ingredientLine(draft.ingredients[2], UnitSystem.US))
+        assertEquals(0.0, draft.ingredients[0].quantityMetric, 0.01)
+        assertEquals("", draft.ingredients[0].unitMetric)
+        assertEquals("g", draft.ingredients[2].unitMetric)
+        assertTrue(draft.ingredients.none { it.name.contains("250") || it.name.contains("ml") })
+    }
+
+    @Test
     fun notesBlockIsCopiedToDraftNotDirections() {
         val text = """
             Chocolate Chip Cookies

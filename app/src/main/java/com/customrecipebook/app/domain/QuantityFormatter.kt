@@ -36,56 +36,91 @@ object QuantityFormatter {
     /**
      * Display shape: `quantity measurement: ingredient`.
      * Missing unit is omitted (`3: eggs`). A missing quantity is not invented.
+     * Density-based gram conversions are marked with a leading `~`.
      */
-    fun structuredLine(quantity: Double, unit: String, name: String, scale: Int = 1): String {
+    fun structuredLine(
+        quantity: Double,
+        unit: String,
+        name: String,
+        scale: Int = 1,
+        approximate: Boolean = false,
+    ): String {
         val qtyText = if (quantity > 0.0) formatAmount(quantity * scale) else ""
         val unitText = unit.trim()
         val nameText = name.trim()
         val lead = listOf(qtyText, unitText).filter { it.isNotEmpty() }.joinToString(" ")
-        return when {
+        val core = when {
             lead.isNotEmpty() && nameText.isNotEmpty() -> "$lead: $nameText"
             lead.isNotEmpty() -> "$lead:"
             else -> nameText
         }
+        return if (approximate && core.isNotEmpty()) "~$core" else core
     }
 
     fun ingredientLine(ingredient: Ingredient, system: UnitSystem, scale: Int): String {
-        val (quantity, unit) = pickFields(
+        val display = resolveDisplay(
+            name = ingredient.name,
             quantityUs = ingredient.quantityUs,
             unitUs = ingredient.unitUs,
             quantityMetric = ingredient.quantityMetric,
             unitMetric = ingredient.unitMetric,
             system = system,
         )
-        return structuredLine(quantity, unit, ingredient.name, scale)
+        return structuredLine(display.quantity, display.unit, ingredient.name, scale, display.approximate)
     }
 
     fun ingredientLine(ingredient: DraftIngredient, system: UnitSystem, scale: Int = 1): String {
-        val (quantity, unit) = pickFields(
+        val display = resolveDisplay(
+            name = ingredient.name,
             quantityUs = ingredient.quantityUs,
             unitUs = ingredient.unitUs,
             quantityMetric = ingredient.quantityMetric,
             unitMetric = ingredient.unitMetric,
             system = system,
         )
-        return structuredLine(quantity, unit, ingredient.name, scale)
+        return structuredLine(display.quantity, display.unit, ingredient.name, scale, display.approximate)
     }
 
-    private fun pickFields(
+    private data class DisplayMeasurement(
+        val quantity: Double,
+        val unit: String,
+        val approximate: Boolean = false,
+    )
+
+    private fun resolveDisplay(
+        name: String,
         quantityUs: Double,
         unitUs: String,
         quantityMetric: Double,
         unitMetric: String,
         system: UnitSystem,
-    ): Pair<Double, String> {
-        val us = quantityUs to unitUs
-        val metric = quantityMetric to unitMetric
+    ): DisplayMeasurement {
         val usPresent = hasMeasurement(quantityUs, unitUs)
         val metricPresent = hasMeasurement(quantityMetric, unitMetric)
         return when (system) {
-            UnitSystem.US -> if (usPresent) us else if (metricPresent) metric else 0.0 to ""
-            UnitSystem.METRIC -> if (metricPresent) metric else if (usPresent) us else 0.0 to ""
+            UnitSystem.US -> when {
+                usPresent -> DisplayMeasurement(quantityUs, unitUs)
+                metricPresent -> DisplayMeasurement(quantityMetric, unitMetric)
+                else -> DisplayMeasurement(0.0, "")
+            }
+            UnitSystem.METRIC -> when {
+                metricPresent -> gramsOrStored(name, quantityMetric, unitMetric)
+                usPresent -> convertToGrams(quantityUs, unitUs, name)
+                    ?: DisplayMeasurement(quantityUs, unitUs)
+                else -> DisplayMeasurement(0.0, "")
+            }
         }
+    }
+
+    private fun gramsOrStored(name: String, quantity: Double, unit: String): DisplayMeasurement {
+        val converted = convertToGrams(quantity, unit, name)
+        if (converted != null && converted.unit == "g") return converted
+        return DisplayMeasurement(quantity, unit)
+    }
+
+    private fun convertToGrams(quantity: Double, unit: String, name: String): DisplayMeasurement? {
+        val result = GramConverter.toGrams(quantity, unit, name) ?: return null
+        return DisplayMeasurement(result.grams, "g", result.approximate)
     }
 
     private fun hasMeasurement(quantity: Double, unit: String): Boolean =

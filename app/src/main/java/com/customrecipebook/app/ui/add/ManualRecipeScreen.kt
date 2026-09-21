@@ -288,7 +288,9 @@ private fun IngredientEditor(
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
-                if (item.quantityMetric > 0.0 || item.unitMetric.isNotBlank()) {
+                val usPresent = item.quantityUs > 0.0 || item.unitUs.isNotBlank()
+                val metricPresent = item.quantityMetric > 0.0 || item.unitMetric.isNotBlank()
+                if (usPresent && metricPresent) {
                     Text(
                         QuantityFormatter.ingredientLine(item, UnitSystem.METRIC),
                         color = Taupe,

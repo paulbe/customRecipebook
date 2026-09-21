@@ -59,14 +59,14 @@ fun SettingsScreen(app: RecipebookApplication, modifier: Modifier = Modifier) {
                 .padding(20.dp),
         ) {
             Text("Default units", color = Espresso, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-            Text("Used on every recipe. You can still switch on the detail screen.", color = Taupe, fontSize = 13.sp)
+            Text("Used on every recipe. You can still switch on the detail screen. Grams converts cups and spoons with typical ingredient weights.", color = Taupe, fontSize = 13.sp)
             Spacer(Modifier.height(12.dp))
             Row {
                 SoftChip("US", selected = units == UnitSystem.US) {
                     scope.launch { app.container.preferences.setUnitSystem(UnitSystem.US) }
                 }
                 Spacer(Modifier.padding(4.dp))
-                SoftChip("Metric", selected = units == UnitSystem.METRIC) {
+                SoftChip("Grams", selected = units == UnitSystem.METRIC) {
                     scope.launch { app.container.preferences.setUnitSystem(UnitSystem.METRIC) }
                 }
             }

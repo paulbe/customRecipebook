@@ -1,6 +1,6 @@
 # Custom Recipebook
 
-A Kotlin + Jetpack Compose cookbook for Android. Keep family recipes in a warm terracotta-and-sand book: import a PDF, snap a page, or type a recipe by hand. Ingredient lines toggle as a checklist, format as `quantity measurement: ingredient`, switch US ↔ Metric from the stored fields, and a batch scaler multiplies every quantity.
+A Kotlin + Jetpack Compose cookbook for Android. Keep family recipes in a warm terracotta-and-sand book: import a PDF, snap a page, or type a recipe by hand. Ingredient lines toggle as a checklist, format as `quantity measurement: ingredient`, switch US ↔ Grams on the recipe page (cups and spoons convert with typical weights), and a batch scaler multiplies every quantity.
 
 The book ships **empty**. Everything on Home comes from a PDF, a photo, or a recipe you type.
 
@@ -8,8 +8,8 @@ The book ships **empty**. Everything on Home comes from a PDF, a photo, or a rec
 
 - **Recipes home** — Custom Recipebook header, All · Dinner · Baking · Saved filters. Tap **+** to reveal PDF / Camera / Manual. Empty state points at that plus button.
 - **Add recipe** — pick a PDF (`application/pdf` document picker), take or choose a photo, or enter a recipe manually.
-- **PDF import** — copies the file into app storage, reads a text layer when one exists, prefills title (from the filename or the first line), ingredients, steps, and a Notes block when the PDF has one, then opens an editable Review form. If extract fails, the PDF is still attached and you fill the form.
-- **Recipe detail** — optional hero photo, **Edit** (opens the same form as create/review and updates that recipe), US ↔ Metric toggle, servings + batch scale (− / N× / +), tappable ingredient checklist (`2 cups: all-purpose flour`), numbered directions. PDF recipes can reopen the attached file.
+- **PDF import** — copies the file into app storage, reads a text layer when one exists, prefills title (from the filename or the first line), ingredients, steps, and a Notes block when the PDF has one, then opens an editable Review form. Dual metric on an ingredient line is dropped when a cup/spoon unit is present (`2 cups (250g) flour` → `2 cups: flour`). Metric-only lines stay metric. If extract fails, the PDF is still attached and you fill the form.
+- **Recipe detail** — optional hero photo, **Edit** (opens the same form as create/review and updates that recipe), **US / Grams** toggle (Grams converts cups, tablespoons, and teaspoons using typical ingredient densities; `~` marks an approximate weight), servings + batch scale (− / N× / +), tappable ingredient checklist (`2 cups: all-purpose flour`), numbered directions. PDF recipes can reopen the attached file.
 - **Shopping & Settings** — shopping lists ingredients you’ve checked off; settings stores the default unit system and can clear checklists.
 - **Local persistence** — Room for recipes, attachments, and checklist state; DataStore for the unit preference. No account or backend.
 

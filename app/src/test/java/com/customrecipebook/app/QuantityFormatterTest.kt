@@ -45,6 +45,38 @@ class QuantityFormatterTest {
     }
 
     @Test
+    fun gramsViewConvertsCupsAndSpoonsWhenMetricNotStored() {
+        val imported = flour.copy(quantityMetric = 0.0, unitMetric = "")
+        assertEquals("2 cups: all-purpose flour", QuantityFormatter.ingredientLine(imported, UnitSystem.US, 1))
+        assertEquals("~240 g: all-purpose flour", QuantityFormatter.ingredientLine(imported, UnitSystem.METRIC, 1))
+        assertEquals("~480 g: all-purpose flour", QuantityFormatter.ingredientLine(imported, UnitSystem.METRIC, 2))
+
+        val oil = flour.copy(
+            name = "oil",
+            quantityUs = 1.0,
+            unitUs = "tbsp",
+            quantityMetric = 0.0,
+            unitMetric = "",
+        )
+        assertEquals("1 tbsp: oil", QuantityFormatter.ingredientLine(oil, UnitSystem.US, 1))
+        assertEquals("~14 g: oil", QuantityFormatter.ingredientLine(oil, UnitSystem.METRIC, 1))
+    }
+
+    @Test
+    fun gramsViewKeepsCountsAndUsesStoredGramsWithoutTilde() {
+        val eggs = flour.copy(
+            name = "eggs",
+            quantityUs = 2.0,
+            unitUs = "",
+            quantityMetric = 0.0,
+            unitMetric = "",
+        )
+        assertEquals("2: eggs", QuantityFormatter.ingredientLine(eggs, UnitSystem.METRIC, 1))
+
+        assertEquals("240 g: all-purpose flour", QuantityFormatter.ingredientLine(flour, UnitSystem.METRIC, 1))
+    }
+
+    @Test
     fun batchScaleUsesStructuredQtyNotReparse() {
         val line = QuantityFormatter.ingredientLine(flour, UnitSystem.US, scale = 2)
         assertEquals("4 cups: all-purpose flour", line)
