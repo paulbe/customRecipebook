@@ -34,16 +34,18 @@ object QuantityFormatter {
     }
 
     /**
-     * Display shape: `qty: unit ingredient name`.
-     * Missing unit is omitted (`2: eggs`). A missing quantity is not invented.
+     * Display shape: `quantity measurement: ingredient`.
+     * Missing unit is omitted (`3: eggs`). A missing quantity is not invented.
      */
     fun structuredLine(quantity: Double, unit: String, name: String, scale: Int = 1): String {
         val qtyText = if (quantity > 0.0) formatAmount(quantity * scale) else ""
-        val rest = listOf(unit.trim(), name.trim()).filter { it.isNotEmpty() }.joinToString(" ")
+        val unitText = unit.trim()
+        val nameText = name.trim()
+        val lead = listOf(qtyText, unitText).filter { it.isNotEmpty() }.joinToString(" ")
         return when {
-            qtyText.isNotEmpty() && rest.isNotEmpty() -> "$qtyText: $rest"
-            qtyText.isNotEmpty() -> "$qtyText:"
-            else -> rest
+            lead.isNotEmpty() && nameText.isNotEmpty() -> "$lead: $nameText"
+            lead.isNotEmpty() -> "$lead:"
+            else -> nameText
         }
     }
 

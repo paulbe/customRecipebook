@@ -35,21 +35,21 @@ class QuantityFormatterTest {
     @Test
     fun usLineUsesQtyUnitNameShape() {
         val line = QuantityFormatter.ingredientLine(flour, UnitSystem.US, scale = 1)
-        assertEquals("2: cups all-purpose flour", line)
+        assertEquals("2 cups: all-purpose flour", line)
     }
 
     @Test
     fun metricLineUsesQtyUnitNameShape() {
         val line = QuantityFormatter.ingredientLine(flour, UnitSystem.METRIC, scale = 1)
-        assertEquals("240: g all-purpose flour", line)
+        assertEquals("240 g: all-purpose flour", line)
     }
 
     @Test
     fun batchScaleUsesStructuredQtyNotReparse() {
         val line = QuantityFormatter.ingredientLine(flour, UnitSystem.US, scale = 2)
-        assertEquals("4: cups all-purpose flour", line)
+        assertEquals("4 cups: all-purpose flour", line)
         val metric = QuantityFormatter.ingredientLine(flour, UnitSystem.METRIC, scale = 2)
-        assertEquals("480: g all-purpose flour", metric)
+        assertEquals("480 g: all-purpose flour", metric)
     }
 
     @Test
@@ -91,7 +91,7 @@ class QuantityFormatterTest {
             quantityMetric = 0.0,
             unitMetric = "",
         )
-        assertEquals("2: large eggs", QuantityFormatter.ingredientLine(eggs, UnitSystem.US, 1))
+        assertEquals("2 large: eggs", QuantityFormatter.ingredientLine(eggs, UnitSystem.US, 1))
     }
 
     @Test
@@ -103,8 +103,8 @@ class QuantityFormatterTest {
             quantityMetric = 5.0,
             unitMetric = "g",
         )
-        assertEquals("1: tsp baking soda", QuantityFormatter.ingredientLine(draft, UnitSystem.US))
-        assertEquals("5: g baking soda", QuantityFormatter.ingredientLine(draft, UnitSystem.METRIC))
+        assertEquals("1 tsp: baking soda", QuantityFormatter.ingredientLine(draft, UnitSystem.US))
+        assertEquals("5 g: baking soda", QuantityFormatter.ingredientLine(draft, UnitSystem.METRIC))
     }
 
     @Test
@@ -116,7 +116,7 @@ class QuantityFormatterTest {
             quantityMetric = 226.0,
             unitMetric = "g",
         )
-        assertEquals("226: g unsalted butter", QuantityFormatter.ingredientLine(butter, UnitSystem.METRIC, 1))
-        assertEquals("226: g unsalted butter", QuantityFormatter.ingredientLine(butter, UnitSystem.US, 1))
+        assertEquals("226 g: unsalted butter", QuantityFormatter.ingredientLine(butter, UnitSystem.METRIC, 1))
+        assertEquals("226 g: unsalted butter", QuantityFormatter.ingredientLine(butter, UnitSystem.US, 1))
     }
 }

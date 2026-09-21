@@ -41,6 +41,10 @@ object RecipeTextParser {
         """^($qtyToken)?:\s*\(([^)]*)\)\s*\((.+)\)\s*$""",
         RegexOption.IGNORE_CASE,
     )
+    private val qtyUnitColonLine = Regex(
+        """^($qtyToken)\s+($unitPattern)\s*:\s*(.+)$""",
+        RegexOption.IGNORE_CASE,
+    )
     private val formattedLine = Regex(
         """^($qtyToken):\s+(?:($unitPattern)\b\s+)?(.+)$""",
         RegexOption.IGNORE_CASE,
@@ -174,6 +178,13 @@ object RecipeTextParser {
             val name = paren.groupValues[3].trim().ifBlank { cleaned }
             return draftFromParts(name, qty, unit)
         }
+        val qtyUnitColon = qtyUnitColonLine.find(cleaned)
+        if (qtyUnitColon != null) {
+            val qty = parseAmount(qtyUnitColon.groupValues[1])
+            val unit = qtyUnitColon.groupValues[2].trim()
+            val name = qtyUnitColon.groupValues[3].trim().ifBlank { cleaned }
+            return draftFromParts(name, qty, unit)
+        }
         val formatted = formattedLine.find(cleaned)
         if (formatted != null) {
             val qty = parseAmount(formatted.groupValues[1])
@@ -237,6 +248,7 @@ object RecipeTextParser {
     private fun looksLikeIngredient(line: String): Boolean {
         val cleaned = line.replace(Regex("^[-•*–]\\s*"), "")
         return formattedParenLine.containsMatchIn(cleaned) ||
+            qtyUnitColonLine.containsMatchIn(cleaned) ||
             formattedLine.containsMatchIn(cleaned) ||
             qtyPattern.containsMatchIn(cleaned)
     }
