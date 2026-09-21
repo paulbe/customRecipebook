@@ -86,11 +86,29 @@ object RecipeTextParser {
         """(?<!\n)\s+(?=[-•*]?\s*\d+(?:\s+\d+/\d+)?\s+(?:$unitPattern)\b)""",
         RegexOption.IGNORE_CASE,
     )
+    private val volumeYieldUnitPattern = listOf(
+        "tablespoons", "tablespoon", "teaspoons", "teaspoon",
+        "tbsp", "tsp", "cups", "cup",
+        "milliliters", "millilitre", "ml", "liters", "litre",
+        "pints", "pint", "quarts", "quart", "gallons", "gallon",
+    ).joinToString("|") { Regex.escape(it) }
+    private val yieldLeadAtEnd = Regex(
+        """(?i)(?:^|[\s;|/])(?:yield|serves|servings|makes(?:\s+about)?)\s*[:\-]?$""",
+    )
+    private val yieldMetaLine = Regex(
+        """(?i)^\s*(?:yield|serves|servings|makes(?:\s+about)?)\s*[:\-]?\s*(?:about\s+)?(?:\d|$)""",
+    )
+    private val yieldLabelOnly = Regex(
+        """(?i)^\s*(?:yield|serves|servings|makes(?:\s+about)?)\s*[:\-]?\s*(?:about\s*)?$""",
+    )
+    private val volumeOnlyLine = Regex(
+        """(?i)^\s*(?:about\s+)?($qtyToken)\s+($volumeYieldUnitPattern)\s*\.?$""",
+    )
     private val timeLabelChunk = Regex(
         """(?i)(prep(?:aration)?(?:\s*time)?|cook(?:ing)?(?:\s*time)?(?!')|bake(?:\s*time)?|oven\s*time|total(?:\s*time)?|ready\s*in)\s*[:\-]?\s*(.*?)(?=(?:prep(?:aration)?(?:\s*time)?|cook(?:ing)?(?:\s*time)?|bake(?:\s*time)?|oven\s*time|total(?:\s*time)?|ready\s*in|yield|serves|servings|makes|ingredients?|directions?|instructions?|method|steps)\b|$)""",
     )
     private val yieldChunk = Regex(
-        """(?i)\b(?:yield|serves|servings|makes(?:\s+about)?)\s*[:\-]?\s*(?:about\s+)?(\d+)""",
+        """(?i)\b(?:yield|serves|servings|makes(?:\s+about)?)\s*[:\-]?\s*(?:about\s+)?(\d+)(?:\s+(?:$unitPattern)\b)?""",
     )
     private val hourDuration = Regex(
         """(?i)^\s*(\d+(?:\.\d+)?)\s*(hours?|hrs?|h)\b(?:\s*(?:and\s+)?(\d+)\s*(?:minutes?|mins?|min)\b)?""",
@@ -153,9 +171,20 @@ object RecipeTextParser {
         return t
     }
 
-    private fun splitGluedQuantities(text: String): String = replaceOutsideParens(text, qtySplit)
+    private fun splitGluedQuantities(text: String): String =
+        replaceOutsideParens(text, qtySplit, skip = ::isQtySplitAfterYieldLead)
 
-    private fun replaceOutsideParens(text: String, pattern: Regex): String {
+    private fun isQtySplitAfterYieldLead(text: String, splitAt: Int): Boolean {
+        val lineStart = text.lastIndexOf('\n', splitAt - 1).let { if (it < 0) 0 else it + 1 }
+        val prefix = text.substring(lineStart, splitAt).trim()
+        return prefix.isNotEmpty() && yieldLeadAtEnd.containsMatchIn(prefix)
+    }
+
+    private fun replaceOutsideParens(
+        text: String,
+        pattern: Regex,
+        skip: (String, Int) -> Boolean = { _, _ -> false },
+    ): String {
         val matches = pattern.findAll(text).toList()
         if (matches.isEmpty()) return text
         val insideParen = BooleanArray(text.length)
@@ -171,6 +200,7 @@ object RecipeTextParser {
         var last = 0
         for (match in matches) {
             if (insideParen.getOrElse(match.range.first) { false }) continue
+            if (skip(text, match.range.first)) continue
             out.append(text, last, match.range.first)
             out.append('\n')
             last = match.range.last + 1
@@ -188,7 +218,11 @@ object RecipeTextParser {
 
         var title = fallbackTitle
         var start = 0
-        if (headerKind(lines.first()) == null && !isMetadataOnlyLine(lines.first()) && lines.first().length in 3..80) {
+        if (headerKind(lines.first()) == null &&
+            !isMetadataOnlyLine(lines.first()) &&
+            !isYieldMetaLine(lines.first()) &&
+            lines.first().length in 3..80
+        ) {
             title = lines.first().trim()
             start = 1
         }
@@ -201,6 +235,7 @@ object RecipeTextParser {
         var cookMinutes = 0
         var totalMinutes = 0
         var servings = 0
+        var expectYieldValue = false
 
         fun mergeTimes(prep: Int, cook: Int, total: Int, serve: Int) {
             if (prepMinutes == 0 && prep > 0) prepMinutes = prep
@@ -209,19 +244,39 @@ object RecipeTextParser {
             if (servings == 0 && serve > 0) servings = serve
         }
 
+        fun appendNote(text: String) {
+            val trimmed = text.trim()
+            if (trimmed.isEmpty()) return
+            if (notes.contains(trimmed)) return
+            if (notes.isNotEmpty()) notes.append('\n')
+            notes.append(trimmed)
+        }
+
+        fun applyYieldLine(line: String) {
+            val meta = extractMetadata(line)
+            val volumeServings = servingsFromVolumeOnly(line)
+            mergeTimes(meta.prepMinutes, meta.cookMinutes, meta.totalMinutes, meta.servings)
+            if (servings == 0 && volumeServings > 0) servings = volumeServings
+            if (isVolumeYieldText(line)) appendNote(line.trim().trimEnd(':').trim())
+        }
+
         fun ingestMetadata(line: String, force: Boolean = false): Boolean {
-            val whole = isMetadataOnlyLine(line)
+            val whole = isMetadataOnlyLine(line) || isYieldMetaLine(line)
             if (whole || force || section == Section.UNKNOWN) {
-                val meta = extractMetadata(line)
-                mergeTimes(meta.prepMinutes, meta.cookMinutes, meta.totalMinutes, meta.servings)
+                applyYieldLine(line)
             }
             return whole
         }
 
         fun consume(target: Section, text: String) {
+            val trimmed = text.trim()
+            if (isYieldMetaLine(trimmed) || (expectYieldValue && isVolumeOnlyLine(trimmed))) {
+                applyYieldLine(trimmed)
+                expectYieldValue = isYieldLabelOnly(trimmed)
+                return
+            }
             when (target) {
                 Section.INGREDIENTS -> {
-                    val trimmed = text.trim()
                     if (ingredients.isNotEmpty() && isParentheticalLine(trimmed)) {
                         val prev = ingredients.last()
                         val note = trimmed.replace(Regex("^[-•*–]\\s*"), "").trim()
@@ -233,23 +288,34 @@ object RecipeTextParser {
                     }
                 }
                 Section.DIRECTIONS -> addDirectionLine(text, directions)
-                Section.NOTES -> {
-                    if (notes.isNotEmpty()) notes.append('\n')
-                    notes.append(text)
-                }
+                Section.NOTES -> appendNote(text)
                 Section.UNKNOWN -> classifyUnknown(text, ingredients, directions)
             }
         }
 
         for (line in lines.drop(start)) {
+            val yieldRemainder = expectYieldValue && isVolumeOnlyLine(line)
+            if (yieldRemainder) {
+                applyYieldLine(line)
+                expectYieldValue = false
+                continue
+            }
             val wholeMeta = ingestMetadata(line)
-            if (wholeMeta) continue
+            if (wholeMeta) {
+                expectYieldValue = isYieldLabelOnly(line)
+                continue
+            }
+            expectYieldValue = false
             val matched = matchHeader(line)
             if (matched != null) {
                 section = matched.first
                 val rest = matched.second
                 ingestMetadata(rest, force = true)
-                if (rest.isNotBlank() && !isParentheticalLine(rest) && !isMetadataOnlyLine(rest)) {
+                if (rest.isNotBlank() &&
+                    !isParentheticalLine(rest) &&
+                    !isMetadataOnlyLine(rest) &&
+                    !isYieldMetaLine(rest)
+                ) {
                     consume(section, rest)
                 }
                 continue
@@ -389,6 +455,7 @@ object RecipeTextParser {
         ingredients: MutableList<DraftIngredient>,
         directions: MutableList<String>,
     ) {
+        if (isYieldMetaLine(line) || isVolumeOnlyLine(line)) return
         when {
             startsWithStep(line) || splitDirectionSteps(line).size > 1 ->
                 addDirectionLine(line, directions)
@@ -401,6 +468,7 @@ object RecipeTextParser {
 
     private fun looksLikeIngredient(line: String): Boolean {
         val cleaned = line.replace(Regex("^[-•*–]\\s*"), "")
+        if (isYieldMetaLine(cleaned) || isVolumeOnlyLine(cleaned)) return false
         return formattedParenLine.containsMatchIn(cleaned) ||
             qtyUnitColonLine.containsMatchIn(cleaned) ||
             formattedLine.containsMatchIn(cleaned) ||
@@ -463,6 +531,7 @@ object RecipeTextParser {
     private fun isMetadataOnlyLine(line: String): Boolean {
         val trimmed = line.trim()
         if (trimmed.isEmpty()) return false
+        if (isYieldMetaLine(trimmed)) return true
         if (!timeLabelChunk.containsMatchIn(trimmed) && !yieldChunk.containsMatchIn(trimmed)) return false
         val leftover = leftoverAfterMetadata(trimmed)
         if (leftover.isEmpty()) return true
@@ -470,6 +539,27 @@ object RecipeTextParser {
         return yieldChunk.containsMatchIn(trimmed) &&
             words.size <= 2 &&
             leftover.none { it.isDigit() }
+    }
+
+    private fun isYieldMetaLine(line: String): Boolean =
+        yieldMetaLine.containsMatchIn(line.trim())
+
+    private fun isYieldLabelOnly(line: String): Boolean =
+        yieldLabelOnly.matches(line.trim())
+
+    private fun isVolumeOnlyLine(line: String): Boolean =
+        volumeOnlyLine.matches(line.replace(Regex("^[-•*–]\\s*"), "").trim())
+
+    private fun servingsFromVolumeOnly(line: String): Int {
+        val match = volumeOnlyLine.find(line.replace(Regex("^[-•*–]\\s*"), "").trim()) ?: return 0
+        return parseAmount(match.groupValues[1]).toInt().coerceAtLeast(0)
+    }
+
+    private fun isVolumeYieldText(line: String): Boolean {
+        val trimmed = line.trim()
+        if (isVolumeOnlyLine(trimmed)) return true
+        if (!isYieldMetaLine(trimmed)) return false
+        return Regex("""(?i)\b(?:$volumeYieldUnitPattern)\b""").containsMatchIn(trimmed)
     }
 
     private fun leftoverAfterMetadata(line: String): String {

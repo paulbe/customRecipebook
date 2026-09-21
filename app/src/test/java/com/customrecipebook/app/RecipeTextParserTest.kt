@@ -368,6 +368,114 @@ class RecipeTextParserTest {
     }
 
     @Test
+    fun cupYieldIsServingsNotAnIngredient() {
+        val parsed = RecipeTextParser.parse(
+            """
+            Sauce
+            Yield: 2 cups
+            Ingredients
+            2 cups: flour
+            1 cup: sugar
+            Directions
+            1. Mix.
+            """.trimIndent(),
+            "Fallback",
+        )
+        assertEquals(2, parsed.servings)
+        assertEquals(listOf("flour", "sugar"), parsed.ingredients.map { it.name })
+        assertTrue(parsed.ingredients.none { it.name.contains("yield", ignoreCase = true) })
+        assertTrue(parsed.notes.contains("2 cups"))
+        val draft = RecipeTextParser.toDraft(parsed, "sauce.pdf", null)
+        assertEquals(2, draft.baseServings)
+        assertEquals(listOf("flour", "sugar"), draft.ingredients.map { it.name })
+    }
+
+    @Test
+    fun makesAboutCupsIsServingsNotAnIngredient() {
+        val parsed = RecipeTextParser.parse(
+            """
+            Frosting
+            Makes about 3 cups
+            Ingredients
+            2 cups: powdered sugar
+            Directions
+            1. Whip.
+            """.trimIndent(),
+            "Fallback",
+        )
+        assertEquals(3, parsed.servings)
+        assertEquals(listOf("powdered sugar"), parsed.ingredients.map { it.name })
+        assertTrue(parsed.notes.contains("3 cups"))
+    }
+
+    @Test
+    fun servingsAndServesCupLinesStayOutOfIngredients() {
+        val servings = RecipeTextParser.parse(
+            """
+            Dip
+            Servings: 2 cups
+            Ingredients
+            1 cup: yogurt
+            Directions
+            1. Stir.
+            """.trimIndent(),
+            "Fallback",
+        )
+        assertEquals(2, servings.servings)
+        assertEquals(listOf("yogurt"), servings.ingredients.map { it.name })
+
+        val serves = RecipeTextParser.parse(
+            """
+            Dip
+            Serves 4 cups
+            Ingredients
+            1 cup: yogurt
+            Directions
+            1. Stir.
+            """.trimIndent(),
+            "Fallback",
+        )
+        assertEquals(4, serves.servings)
+        assertEquals(listOf("yogurt"), serves.ingredients.map { it.name })
+    }
+
+    @Test
+    fun twoLineYieldVolumeIsNotAnIngredient() {
+        val parsed = RecipeTextParser.parse(
+            """
+            Stock
+            Yield:
+            2 cups
+            Ingredients
+            2 cups: chicken bones
+            Directions
+            1. Simmer.
+            """.trimIndent(),
+            "Fallback",
+        )
+        assertEquals(2, parsed.servings)
+        assertEquals(listOf("chicken bones"), parsed.ingredients.map { it.name })
+        assertTrue(parsed.ingredients.none { it.name.equals("2 cups", ignoreCase = true) })
+    }
+
+    @Test
+    fun yieldLineInsideIngredientsIsNotAnIngredientRow() {
+        val parsed = RecipeTextParser.parse(
+            """
+            Sauce
+            Ingredients
+            Yield: 2 cups
+            2 cups: tomatoes
+            Directions
+            1. Reduce.
+            """.trimIndent(),
+            "Fallback",
+        )
+        assertEquals(2, parsed.servings)
+        assertEquals(listOf("tomatoes"), parsed.ingredients.map { it.name })
+    }
+
+    @Test
     fun notesMinutesAreNotCookTime() {
         val parsed = RecipeTextParser.parse(
             """
