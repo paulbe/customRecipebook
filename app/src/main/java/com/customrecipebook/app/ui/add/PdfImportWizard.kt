@@ -26,8 +26,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
@@ -38,7 +36,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlin.math.roundToInt
 import com.customrecipebook.app.data.DraftIngredient
 import com.customrecipebook.app.data.ImportSource
 import com.customrecipebook.app.data.RecipeDraft
@@ -270,19 +267,7 @@ private fun BoundarySlide(draft: RecipeDraft, vm: AddRecipeViewModel) {
                 icon = Icons.Outlined.KeyboardArrowDown,
             ) { vm.setIngredientNotesCut(cut + 1) }
         }
-        if (total > 1) {
-            Slider(
-                value = cut.toFloat(),
-                onValueChange = { vm.setIngredientNotesCut(it.roundToInt()) },
-                valueRange = 0f..total.toFloat(),
-                steps = (total - 1).coerceAtLeast(0),
-                colors = SliderDefaults.colors(
-                    thumbColor = Terracotta,
-                    activeTrackColor = Terracotta,
-                    inactiveTrackColor = Clay,
-                ),
-            )
-        }
+        Spacer(Modifier.height(10.dp))
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(6.dp),
