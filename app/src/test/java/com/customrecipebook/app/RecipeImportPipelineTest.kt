@@ -40,6 +40,9 @@ class RecipeImportPipelineTest {
         )
         assertTrue(draft.directions.first().contains("Preheat"))
         assertTrue(draft.parseMessage.contains("3 ingredients") || draft.ingredients.isNotEmpty())
+        assertEquals("", draft.subtitle)
+        assertEquals("servings", draft.servingsUnit)
+        assertEquals("Easy", draft.difficulty)
     }
 
     @Test

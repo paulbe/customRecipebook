@@ -116,7 +116,9 @@ fun ManualRecipeScreen(
                 }
             }
             Field("Title", draft.title) { vm.updateDraft { d -> d.copy(title = it) } }
-            Field("Short description", draft.subtitle) { vm.updateDraft { d -> d.copy(subtitle = it) } }
+            if (draft.source != ImportSource.PDF) {
+                Field("Short description", draft.subtitle) { vm.updateDraft { d -> d.copy(subtitle = it) } }
+            }
             Text("Category", color = Taupe, fontSize = 12.sp, fontWeight = FontWeight.Medium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 RecipeRepository.supportedCategories.forEach { category ->
@@ -147,8 +149,10 @@ fun ManualRecipeScreen(
                     }
                 }
             }
-            Field("Servings label", draft.servingsUnit) { value -> vm.updateDraft { it.copy(servingsUnit = value) } }
-            Field("Difficulty", draft.difficulty) { value -> vm.updateDraft { it.copy(difficulty = value) } }
+            if (draft.source != ImportSource.PDF) {
+                Field("Servings label", draft.servingsUnit) { value -> vm.updateDraft { it.copy(servingsUnit = value) } }
+                Field("Difficulty", draft.difficulty) { value -> vm.updateDraft { it.copy(difficulty = value) } }
+            }
 
             SectionHeader("Ingredients", count = draft.ingredients.size) {
                 vm.updateDraft { d ->

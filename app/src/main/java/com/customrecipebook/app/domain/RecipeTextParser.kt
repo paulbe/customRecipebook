@@ -150,7 +150,7 @@ object RecipeTextParser {
         }
         return RecipeDraft(
             title = parsed.title,
-            subtitle = parsed.subtitle,
+            subtitle = "",
             source = ImportSource.PDF,
             imageUri = null,
             attachmentUri = attachmentPath,
