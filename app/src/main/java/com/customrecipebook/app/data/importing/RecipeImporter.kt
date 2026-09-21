@@ -49,7 +49,6 @@ class RecipeImporter(private val app: Application) {
         }
         RecipeDraft(
             title = title,
-            subtitle = "Photo attached — add ingredients and steps",
             source = ImportSource.CAMERA,
             imageUri = copied.absolutePath,
             attachmentUri = copied.absolutePath,
