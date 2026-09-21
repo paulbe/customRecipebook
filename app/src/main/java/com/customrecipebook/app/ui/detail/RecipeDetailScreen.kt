@@ -69,6 +69,7 @@ import java.io.File
 @Composable
 fun RecipeDetailScreen(
     onBack: () -> Unit,
+    onEdit: (Recipe) -> Unit,
     app: RecipebookApplication,
 ) {
     val vm: RecipeDetailViewModel = viewModel(
@@ -99,7 +100,7 @@ fun RecipeDetailScreen(
             .verticalScroll(rememberScrollState())
             .navigationBarsPadding(),
     ) {
-        Hero(recipe = recipe, onBack = onBack, onToggleSaved = vm::toggleSaved)
+        Hero(recipe = recipe, onBack = onBack, onEdit = { onEdit(recipe) }, onToggleSaved = vm::toggleSaved)
         Column(Modifier.padding(horizontal = 20.dp)) {
             Text(recipe.title, color = Espresso, fontSize = 28.sp, fontWeight = FontWeight.SemiBold, lineHeight = 34.sp)
             if (recipe.subtitle.isNotBlank()) {
@@ -166,7 +167,7 @@ fun RecipeDetailScreen(
 }
 
 @Composable
-private fun Hero(recipe: Recipe, onBack: () -> Unit, onToggleSaved: () -> Unit) {
+private fun Hero(recipe: Recipe, onBack: () -> Unit, onEdit: () -> Unit, onToggleSaved: () -> Unit) {
     val context = LocalContext.current
     val photoModel = recipe.imageUri?.let { path ->
         if (path.startsWith("/")) File(path) else Uri.parse(path)
@@ -204,6 +205,18 @@ private fun Hero(recipe: Recipe, onBack: () -> Unit, onToggleSaved: () -> Unit) 
         ) {
             BackCircle(onClick = onBack, light = true)
             Spacer(Modifier.weight(1f))
+            Text(
+                "Edit",
+                color = Espresso,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .clip(PillShape)
+                    .background(Ivory.copy(alpha = 0.94f))
+                    .clickable(onClick = onEdit)
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+            )
+            Spacer(Modifier.width(8.dp))
             if (recipe.source == ImportSource.PDF) {
                 Text(
                     recipe.attachmentName?.let { "PDF" } ?: recipe.source.label(),

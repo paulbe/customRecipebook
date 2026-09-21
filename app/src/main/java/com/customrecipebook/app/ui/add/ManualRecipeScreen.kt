@@ -78,7 +78,12 @@ fun ManualRecipeScreen(
         ) {
             BackCircle(onClick = onBack)
             Spacer(Modifier.width(12.dp))
-            Text("Recipe details", color = Espresso, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                if (state.editingRecipeId != null) "Edit recipe" else "Recipe details",
+                color = Espresso,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
         }
 
         Column(
@@ -189,7 +194,12 @@ fun ManualRecipeScreen(
                 .padding(vertical = 16.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Text("Save recipe", color = Ivory, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Text(
+                if (state.editingRecipeId != null) "Save changes" else "Save recipe",
+                color = Ivory,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 16.sp,
+            )
         }
     }
 }

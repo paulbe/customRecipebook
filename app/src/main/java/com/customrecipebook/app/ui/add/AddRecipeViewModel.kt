@@ -3,9 +3,11 @@ package com.customrecipebook.app.ui.add
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.customrecipebook.app.data.Recipe
 import com.customrecipebook.app.data.RecipeDraft
 import com.customrecipebook.app.data.importing.RecipeImporter
 import com.customrecipebook.app.data.repo.RecipeRepository
+import com.customrecipebook.app.data.toDraft
 import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -34,6 +36,7 @@ class AddRecipeViewModel(
                             hasPreview = true,
                             isParsing = false,
                             parseLabel = draft.attachmentName ?: "PDF",
+                            editingRecipeId = null,
                         )
                     }
                     onReady()
@@ -60,6 +63,7 @@ class AddRecipeViewModel(
                             hasPreview = true,
                             isParsing = false,
                             parseLabel = draft.attachmentName ?: "Photo",
+                            editingRecipeId = null,
                         )
                     }
                     onReady()
@@ -86,13 +90,20 @@ class AddRecipeViewModel(
             return
         }
         viewModelScope.launch {
-            val id = repository.saveDraft(draft)
+            val id = repository.saveDraft(draft, existingId = _state.value.editingRecipeId)
             onSaved(id)
         }
     }
 
     fun startBlankManual() {
         _state.value = AddRecipeUiState(draft = RecipeDraft())
+    }
+
+    fun startEdit(recipe: Recipe) {
+        _state.value = AddRecipeUiState(
+            draft = recipe.toDraft(),
+            editingRecipeId = recipe.id,
+        )
     }
 
     fun clearError() {
@@ -106,4 +117,5 @@ data class AddRecipeUiState(
     val isParsing: Boolean = false,
     val parseLabel: String = "",
     val error: String? = null,
+    val editingRecipeId: String? = null,
 )

@@ -144,7 +144,10 @@ fun RecipebookNav() {
                 ManualRecipeScreen(
                     onBack = { nav.popBackStack() },
                     onSaved = { id ->
-                        nav.navigate("recipe/$id") { popUpTo(Tab.Recipes.route) }
+                        val returnedToDetail = nav.popBackStack("recipe/$id", inclusive = false)
+                        if (!returnedToDetail) {
+                            nav.navigate("recipe/$id") { popUpTo(Tab.Recipes.route) }
+                        }
                     },
                     app = app,
                 )
@@ -153,7 +156,14 @@ fun RecipebookNav() {
                 route = "recipe/{recipeId}",
                 arguments = listOf(navArgument("recipeId") { type = NavType.StringType }),
             ) {
-                RecipeDetailScreen(onBack = { nav.popBackStack() }, app = app)
+                RecipeDetailScreen(
+                    onBack = { nav.popBackStack() },
+                    onEdit = { recipe ->
+                        addVm.startEdit(recipe)
+                        nav.navigate("manual")
+                    },
+                    app = app,
+                )
             }
         }
     }

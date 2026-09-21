@@ -76,6 +76,31 @@ data class RecipeDraft(
     val instructionsConfidence: Int = 0,
 )
 
+fun Recipe.toDraft(): RecipeDraft = RecipeDraft(
+    title = title,
+    subtitle = subtitle,
+    category = if (category == RecipeCategory.BAKING) RecipeCategory.BAKING else RecipeCategory.DINNER,
+    minutes = minutes,
+    baseServings = baseServings,
+    servingsUnit = servingsUnit,
+    difficulty = difficulty,
+    source = source,
+    imageUri = imageUri,
+    attachmentUri = attachmentUri,
+    attachmentName = attachmentName,
+    ingredients = ingredients.map {
+        DraftIngredient(
+            name = it.name,
+            quantityUs = it.quantityUs,
+            unitUs = it.unitUs,
+            quantityMetric = it.quantityMetric,
+            unitMetric = it.unitMetric,
+            metricApprox = it.metricApprox,
+        )
+    },
+    directions = directions.sortedBy { it.stepNumber }.map { it.text },
+)
+
 data class DraftIngredient(
     val name: String,
     val quantityUs: Double,

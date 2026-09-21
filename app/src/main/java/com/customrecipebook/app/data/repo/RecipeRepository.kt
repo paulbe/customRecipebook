@@ -56,8 +56,9 @@ class RecipeRepository(private val db: AppDatabase) {
         dao.clearAllChecks()
     }
 
-    suspend fun saveDraft(draft: RecipeDraft): String {
-        val id = "recipe-${UUID.randomUUID()}"
+    suspend fun saveDraft(draft: RecipeDraft, existingId: String? = null): String {
+        val existing = existingId?.let { dao.getRecipe(it) }
+        val id = existing?.id ?: "recipe-${UUID.randomUUID()}"
         val now = System.currentTimeMillis()
         val recipe = RecipeEntity(
             id = id,
@@ -68,13 +69,13 @@ class RecipeRepository(private val db: AppDatabase) {
             baseServings = draft.baseServings.coerceAtLeast(1),
             servingsUnit = draft.servingsUnit.ifBlank { "servings" },
             difficulty = draft.difficulty.ifBlank { "Easy" },
-            imageKey = null,
-            imageUri = draft.imageUri,
-            attachmentUri = draft.attachmentUri,
-            attachmentName = draft.attachmentName,
-            isSaved = false,
+            imageKey = existing?.imageKey,
+            imageUri = draft.imageUri ?: existing?.imageUri,
+            attachmentUri = draft.attachmentUri ?: existing?.attachmentUri,
+            attachmentName = draft.attachmentName ?: existing?.attachmentName,
+            isSaved = existing?.isSaved ?: false,
             source = draft.source.name,
-            createdAt = now,
+            createdAt = existing?.createdAt ?: now,
         )
         val ingredients = draft.ingredients.mapIndexed { index, item ->
             IngredientEntity(
@@ -98,7 +99,11 @@ class RecipeRepository(private val db: AppDatabase) {
                 text = text,
             )
         }
-        dao.insertFullRecipe(recipe, ingredients, directions)
+        if (existing != null) {
+            dao.replaceFullRecipe(recipe, ingredients, directions)
+        } else {
+            dao.insertFullRecipe(recipe, ingredients, directions)
+        }
         return id
     }
 

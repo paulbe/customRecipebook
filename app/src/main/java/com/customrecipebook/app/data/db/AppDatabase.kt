@@ -74,6 +74,9 @@ interface RecipeDao {
     @Query("SELECT * FROM directions WHERE recipeId = :recipeId ORDER BY stepNumber")
     fun observeDirections(recipeId: String): Flow<List<DirectionEntity>>
 
+    @Query("SELECT * FROM recipes WHERE id = :id")
+    suspend fun getRecipe(id: String): RecipeEntity?
+
     @Query("SELECT COUNT(*) FROM recipes")
     suspend fun recipeCount(): Int
 
@@ -103,6 +106,19 @@ interface RecipeDao {
 
     @Query("DELETE FROM directions WHERE recipeId = :recipeId")
     suspend fun deleteDirections(recipeId: String)
+
+    @Transaction
+    suspend fun replaceFullRecipe(
+        recipe: RecipeEntity,
+        ingredients: List<IngredientEntity>,
+        directions: List<DirectionEntity>,
+    ) {
+        insertRecipes(listOf(recipe))
+        deleteIngredients(recipe.id)
+        deleteDirections(recipe.id)
+        insertIngredients(ingredients)
+        insertDirections(directions)
+    }
 
     @Transaction
     suspend fun insertFullRecipe(
