@@ -17,7 +17,7 @@ class RecipeDraftMappingTest {
             title = "Tomato Soup",
             subtitle = "",
             category = RecipeCategory.DINNER,
-            minutes = 40,
+            totalMinutes = 40,
             baseServings = 6,
             servingsUnit = "servings",
             difficulty = "Easy",
@@ -46,6 +46,9 @@ class RecipeDraftMappingTest {
         assertEquals("Tomato Soup", draft.title)
         assertEquals(RecipeCategory.DINNER, draft.category)
         assertEquals(40, draft.minutes)
+        assertEquals(40, draft.totalMinutes)
+        assertEquals(0, draft.prepMinutes)
+        assertEquals(0, draft.cookMinutes)
         assertEquals(6, draft.baseServings)
         assertEquals("tomatoes", draft.ingredients.single().name)
         assertEquals(2.0, draft.ingredients.single().quantityUs, 0.01)

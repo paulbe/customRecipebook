@@ -10,6 +10,10 @@ data class ParsedRecipeText(
     val ingredients: List<DraftIngredient>,
     val directions: List<String>,
     val notes: String = "",
+    val prepMinutes: Int = 0,
+    val cookMinutes: Int = 0,
+    val totalMinutes: Int = 0,
+    val servings: Int = 0,
     val extracted: Boolean,
     val sourceText: String = "",
 )
@@ -82,6 +86,19 @@ object RecipeTextParser {
         """(?<!\n)\s+(?=[-•*]?\s*\d+(?:\s+\d+/\d+)?\s+(?:$unitPattern)\b)""",
         RegexOption.IGNORE_CASE,
     )
+    private val timeLabelChunk = Regex(
+        """(?i)(prep(?:aration)?(?:\s*time)?|cook(?:ing)?(?:\s*time)?(?!')|bake(?:\s*time)?|oven\s*time|total(?:\s*time)?|ready\s*in)\s*[:\-]?\s*(.*?)(?=(?:prep(?:aration)?(?:\s*time)?|cook(?:ing)?(?:\s*time)?|bake(?:\s*time)?|oven\s*time|total(?:\s*time)?|ready\s*in|yield|serves|servings|makes|ingredients?|directions?|instructions?|method|steps)\b|$)""",
+    )
+    private val yieldChunk = Regex(
+        """(?i)\b(?:yield|serves|servings|makes(?:\s+about)?)\s*[:\-]?\s*(?:about\s+)?(\d+)""",
+    )
+    private val hourDuration = Regex(
+        """(?i)^\s*(\d+(?:\.\d+)?)\s*(hours?|hrs?|h)\b(?:\s*(?:and\s+)?(\d+)\s*(?:minutes?|mins?|min)\b)?""",
+    )
+    private val minuteDuration = Regex(
+        """(?i)^\s*(\d+(?:\.\d+)?)\s*(minutes?|mins?|min)\b""",
+    )
+    private val bareDuration = Regex("""^\s*(\d+)\s*$""")
 
     fun titleFromFileName(name: String): String {
         val base = name.substringAfterLast('/')
@@ -171,7 +188,7 @@ object RecipeTextParser {
 
         var title = fallbackTitle
         var start = 0
-        if (headerKind(lines.first()) == null && lines.first().length in 3..80) {
+        if (headerKind(lines.first()) == null && !isMetadataOnlyLine(lines.first()) && lines.first().length in 3..80) {
             title = lines.first().trim()
             start = 1
         }
@@ -180,6 +197,26 @@ object RecipeTextParser {
         val directions = mutableListOf<String>()
         val notes = StringBuilder()
         var section = Section.UNKNOWN
+        var prepMinutes = 0
+        var cookMinutes = 0
+        var totalMinutes = 0
+        var servings = 0
+
+        fun mergeTimes(prep: Int, cook: Int, total: Int, serve: Int) {
+            if (prepMinutes == 0 && prep > 0) prepMinutes = prep
+            if (cookMinutes == 0 && cook > 0) cookMinutes = cook
+            if (totalMinutes == 0 && total > 0) totalMinutes = total
+            if (servings == 0 && serve > 0) servings = serve
+        }
+
+        fun ingestMetadata(line: String, force: Boolean = false): Boolean {
+            val whole = isMetadataOnlyLine(line)
+            if (whole || force || section == Section.UNKNOWN) {
+                val meta = extractMetadata(line)
+                mergeTimes(meta.prepMinutes, meta.cookMinutes, meta.totalMinutes, meta.servings)
+            }
+            return whole
+        }
 
         fun consume(target: Section, text: String) {
             when (target) {
@@ -205,11 +242,16 @@ object RecipeTextParser {
         }
 
         for (line in lines.drop(start)) {
+            val wholeMeta = ingestMetadata(line)
+            if (wholeMeta) continue
             val matched = matchHeader(line)
             if (matched != null) {
                 section = matched.first
                 val rest = matched.second
-                if (rest.isNotBlank() && !isParentheticalLine(rest)) consume(section, rest)
+                ingestMetadata(rest, force = true)
+                if (rest.isNotBlank() && !isParentheticalLine(rest) && !isMetadataOnlyLine(rest)) {
+                    consume(section, rest)
+                }
                 continue
             }
             consume(section, line)
@@ -237,6 +279,10 @@ object RecipeTextParser {
             ingredients = ingredients,
             directions = directions,
             notes = notes.toString().trim(),
+            prepMinutes = prepMinutes,
+            cookMinutes = cookMinutes,
+            totalMinutes = totalMinutes,
+            servings = servings,
             extracted = extracted,
             sourceText = raw.trim(),
         )
@@ -261,6 +307,10 @@ object RecipeTextParser {
             attachmentUri = attachmentPath,
             attachmentName = fileName,
             notes = parsed.notes,
+            prepMinutes = parsed.prepMinutes,
+            cookMinutes = parsed.cookMinutes,
+            totalMinutes = parsed.totalMinutes,
+            baseServings = parsed.servings.takeIf { it > 0 } ?: 4,
             ingredients = parsed.ingredients,
             directions = parsed.directions,
             parseMessage = message,
@@ -371,6 +421,71 @@ object RecipeTextParser {
     }
 
     private fun headerKind(line: String): Section? = matchHeader(line)?.first
+
+    internal fun parseDurationToMinutes(raw: String): Int? {
+        val text = raw.trim()
+        if (text.isEmpty()) return null
+        hourDuration.find(text)?.let { match ->
+            val hours = match.groupValues[1].toDoubleOrNull() ?: return@let
+            val extra = match.groupValues[3].toIntOrNull() ?: 0
+            return (hours * 60).toInt() + extra
+        }
+        minuteDuration.find(text)?.let { match ->
+            return match.groupValues[1].toDoubleOrNull()?.toInt()
+        }
+        return bareDuration.find(text)?.groupValues?.get(1)?.toIntOrNull()
+    }
+
+    private data class LineMetadata(
+        val prepMinutes: Int = 0,
+        val cookMinutes: Int = 0,
+        val totalMinutes: Int = 0,
+        val servings: Int = 0,
+    )
+
+    private fun extractMetadata(line: String): LineMetadata {
+        var prep = 0
+        var cook = 0
+        var total = 0
+        timeLabelChunk.findAll(line).forEach { match ->
+            val minutes = parseDurationToMinutes(match.groupValues[2]) ?: return@forEach
+            if (minutes <= 0) return@forEach
+            when (timeFieldForLabel(match.groupValues[1])) {
+                TimeField.PREP -> if (prep == 0) prep = minutes
+                TimeField.COOK -> if (cook == 0) cook = minutes
+                TimeField.TOTAL -> if (total == 0) total = minutes
+            }
+        }
+        val servings = yieldChunk.find(line)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+        return LineMetadata(prep, cook, total, servings)
+    }
+
+    private fun isMetadataOnlyLine(line: String): Boolean {
+        val trimmed = line.trim()
+        if (trimmed.isEmpty()) return false
+        if (!timeLabelChunk.containsMatchIn(trimmed) && !yieldChunk.containsMatchIn(trimmed)) return false
+        val leftover = leftoverAfterMetadata(trimmed)
+        if (leftover.isEmpty()) return true
+        val words = leftover.split(Regex("\\s+")).filter { it.isNotBlank() }
+        return yieldChunk.containsMatchIn(trimmed) &&
+            words.size <= 2 &&
+            leftover.none { it.isDigit() }
+    }
+
+    private fun leftoverAfterMetadata(line: String): String {
+        var text = timeLabelChunk.replace(line, " ")
+        text = yieldChunk.replace(text, " ")
+        return text.replace(Regex("""[\s()|:;,\-–—/.]+"""), " ").trim()
+    }
+
+    private fun timeFieldForLabel(label: String): TimeField {
+        val key = label.lowercase().replace(Regex("\\s+"), " ").trim()
+        return when {
+            key.startsWith("prep") -> TimeField.PREP
+            key.startsWith("total") || key.startsWith("ready") -> TimeField.TOTAL
+            else -> TimeField.COOK
+        }
+    }
 
     private fun matchHeader(line: String): Pair<Section, String>? {
         val raw = line.trim().replace('’', '\'').replace('`', '\'')
@@ -509,4 +624,5 @@ object RecipeTextParser {
     }
 
     private enum class Section { UNKNOWN, INGREDIENTS, DIRECTIONS, NOTES }
+    private enum class TimeField { PREP, COOK, TOTAL }
 }

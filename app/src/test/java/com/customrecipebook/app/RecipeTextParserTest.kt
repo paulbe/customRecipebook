@@ -286,6 +286,109 @@ class RecipeTextParserTest {
     }
 
     @Test
+    fun parseDurationReadsHoursAndMinutes() {
+        assertEquals(15, RecipeTextParser.parseDurationToMinutes("15 min"))
+        assertEquals(15, RecipeTextParser.parseDurationToMinutes("15 minutes"))
+        assertEquals(60, RecipeTextParser.parseDurationToMinutes("1 hour"))
+        assertEquals(75, RecipeTextParser.parseDurationToMinutes("1 hour 15 minutes"))
+        assertEquals(90, RecipeTextParser.parseDurationToMinutes("1.5 hours"))
+        assertEquals(20, RecipeTextParser.parseDurationToMinutes("20"))
+    }
+
+    @Test
+    fun pdfTimesAndYieldFillDraftFields() {
+        val parsed = RecipeTextParser.parse(
+            """
+            Cookies
+            Prep time: 15 min
+            Cook time: 12 minutes
+            Total: 27 min
+            Yield: 12 cookies
+            Ingredients
+            2 cups flour
+            Directions
+            1. Mix.
+            """.trimIndent(),
+            "Fallback",
+        )
+        assertEquals(15, parsed.prepMinutes)
+        assertEquals(12, parsed.cookMinutes)
+        assertEquals(27, parsed.totalMinutes)
+        assertEquals(12, parsed.servings)
+        assertEquals("flour", parsed.ingredients.single().name)
+        assertEquals(listOf("Mix."), parsed.directions)
+        val draft = RecipeTextParser.toDraft(parsed, "cookies.pdf", null)
+        assertEquals(15, draft.prepMinutes)
+        assertEquals(12, draft.cookMinutes)
+        assertEquals(27, draft.totalMinutes)
+        assertEquals(12, draft.baseServings)
+        assertEquals(27, draft.minutes)
+    }
+
+    @Test
+    fun readyInAndServesFillWhatIsPresent() {
+        val parsed = RecipeTextParser.parse(
+            """
+            Soup
+            Ready in: 40 minutes
+            Serves 4
+            Ingredients
+            2 cups broth
+            Directions
+            1. Simmer 20 minutes.
+            """.trimIndent(),
+            "Fallback",
+        )
+        assertEquals(0, parsed.prepMinutes)
+        assertEquals(0, parsed.cookMinutes)
+        assertEquals(40, parsed.totalMinutes)
+        assertEquals(4, parsed.servings)
+        assertEquals(listOf("Simmer 20 minutes."), parsed.directions)
+    }
+
+    @Test
+    fun bakeTimeCountsAsCookAndHeaderServesSetsServings() {
+        val parsed = RecipeTextParser.parse(
+            """
+            Cake
+            Prep: 20 min
+            Bake time: 35 min
+            Ingredients (serves 8)
+            1 cup sugar
+            Directions
+            1. Bake.
+            """.trimIndent(),
+            "Fallback",
+        )
+        assertEquals(20, parsed.prepMinutes)
+        assertEquals(35, parsed.cookMinutes)
+        assertEquals(0, parsed.totalMinutes)
+        assertEquals(8, parsed.servings)
+        assertEquals("sugar", parsed.ingredients.single().name)
+    }
+
+    @Test
+    fun notesMinutesAreNotCookTime() {
+        val parsed = RecipeTextParser.parse(
+            """
+            Roast
+            Ingredients
+            1 lb beef
+            Method
+            1. Sear the meat.
+            Chef's notes
+            Rest 10 minutes before slicing.
+            """.trimIndent(),
+            "Fallback",
+        )
+        assertEquals(0, parsed.prepMinutes)
+        assertEquals(0, parsed.cookMinutes)
+        assertEquals(0, parsed.totalMinutes)
+        assertEquals("Rest 10 minutes before slicing.", parsed.notes)
+        assertEquals(listOf("Sear the meat."), parsed.directions)
+    }
+
+    @Test
     fun parseIngredientLineReadsFormattedShape() {
         val colon = RecipeTextParser.parseIngredientLine("2 cups: all-purpose flour")
         assertEquals("all-purpose flour", colon.name)

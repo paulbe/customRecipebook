@@ -127,6 +127,7 @@ object QuantityFormatter {
         quantity > 0.0 || unit.isNotBlank()
 
     fun formatMinutes(minutes: Int): String {
+        if (minutes <= 0) return ""
         return if (minutes >= 60 && minutes % 60 == 0) {
             val hours = minutes / 60
             if (hours == 1) "1 hr" else "$hours hr"

@@ -109,9 +109,22 @@ fun RecipeDetailScreen(
             }
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SoftChip(QuantityFormatter.formatMinutes(recipe.minutes))
-                SoftChip(recipe.difficulty)
                 SoftChip(recipe.category.label)
+                if (recipe.difficulty.isNotBlank()) SoftChip(recipe.difficulty)
+            }
+            val timeChips = buildList {
+                if (recipe.prepMinutes > 0) add("Prep ${QuantityFormatter.formatMinutes(recipe.prepMinutes)}")
+                if (recipe.cookMinutes > 0) add("Cook ${QuantityFormatter.formatMinutes(recipe.cookMinutes)}")
+                if (recipe.totalMinutes > 0) add("Total ${QuantityFormatter.formatMinutes(recipe.totalMinutes)}")
+                else if (recipe.minutes > 0 && recipe.prepMinutes == 0 && recipe.cookMinutes == 0) {
+                    add(QuantityFormatter.formatMinutes(recipe.minutes))
+                }
+            }
+            if (timeChips.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    timeChips.forEach { SoftChip(it) }
+                }
             }
             Spacer(Modifier.height(18.dp))
             UnitToggle(state.unitSystem, vm::setUnitSystem)

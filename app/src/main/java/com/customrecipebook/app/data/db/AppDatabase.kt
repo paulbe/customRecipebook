@@ -22,7 +22,9 @@ data class RecipeEntity(
     val title: String,
     val subtitle: String,
     val category: String,
-    val minutes: Int,
+    val prepMinutes: Int = 0,
+    val cookMinutes: Int = 0,
+    val totalMinutes: Int = 0,
     val baseServings: Int,
     val servingsUnit: String,
     val difficulty: String,
@@ -135,7 +137,7 @@ interface RecipeDao {
 
 @Database(
     entities = [RecipeEntity::class, IngredientEntity::class, DirectionEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -150,7 +152,9 @@ fun RecipeEntity.toModel(
     title = title,
     subtitle = subtitle,
     category = runCatching { RecipeCategory.valueOf(category) }.getOrDefault(RecipeCategory.DINNER),
-    minutes = minutes,
+    prepMinutes = prepMinutes,
+    cookMinutes = cookMinutes,
+    totalMinutes = totalMinutes,
     baseServings = baseServings,
     servingsUnit = servingsUnit,
     difficulty = difficulty,
@@ -171,7 +175,9 @@ fun Recipe.toEntity(): RecipeEntity = RecipeEntity(
     title = title,
     subtitle = subtitle,
     category = category.name,
-    minutes = minutes,
+    prepMinutes = prepMinutes,
+    cookMinutes = cookMinutes,
+    totalMinutes = totalMinutes,
     baseServings = baseServings,
     servingsUnit = servingsUnit,
     difficulty = difficulty,

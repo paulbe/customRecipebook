@@ -244,7 +244,10 @@ private fun RecipeCard(recipe: Recipe, onClick: () -> Unit) {
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                "${QuantityFormatter.formatMinutes(recipe.minutes)}  ·  ${recipe.yieldLabel()}",
+                listOfNotNull(
+                    QuantityFormatter.formatMinutes(recipe.minutes).takeIf { recipe.minutes > 0 },
+                    recipe.yieldLabel(),
+                ).joinToString("  ·  "),
                 color = Taupe,
                 fontSize = 13.sp,
             )

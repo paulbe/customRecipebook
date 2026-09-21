@@ -137,11 +137,31 @@ fun ManualRecipeScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box(Modifier.weight(1f)) {
                     Field(
-                        "Minutes",
-                        draft.minutes.toString(),
+                        "Prep time (min)",
+                        draft.prepMinutes.toMinutesInput(),
                         keyboard = KeyboardType.Number,
                     ) { value ->
-                        vm.updateDraft { it.copy(minutes = value.filter(Char::isDigit).toIntOrNull() ?: 0) }
+                        vm.updateDraft { it.copy(prepMinutes = value.filter(Char::isDigit).toIntOrNull() ?: 0) }
+                    }
+                }
+                Box(Modifier.weight(1f)) {
+                    Field(
+                        "Cook time (min)",
+                        draft.cookMinutes.toMinutesInput(),
+                        keyboard = KeyboardType.Number,
+                    ) { value ->
+                        vm.updateDraft { it.copy(cookMinutes = value.filter(Char::isDigit).toIntOrNull() ?: 0) }
+                    }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(Modifier.weight(1f)) {
+                    Field(
+                        "Total time (min)",
+                        draft.totalMinutes.toMinutesInput(),
+                        keyboard = KeyboardType.Number,
+                    ) { value ->
+                        vm.updateDraft { it.copy(totalMinutes = value.filter(Char::isDigit).toIntOrNull() ?: 0) }
                     }
                 }
                 Box(Modifier.weight(1f)) {
@@ -371,3 +391,5 @@ private fun Field(
 
 private fun Double.toPlain(): String =
     if (this == toLong().toDouble()) toLong().toString() else toString()
+
+private fun Int.toMinutesInput(): String = if (this > 0) toString() else ""

@@ -89,6 +89,7 @@ class QuantityFormatterTest {
         assertEquals("35 min", QuantityFormatter.formatMinutes(35))
         assertEquals("1 hr", QuantityFormatter.formatMinutes(60))
         assertEquals("3 hr", QuantityFormatter.formatMinutes(180))
+        assertEquals("", QuantityFormatter.formatMinutes(0))
     }
 
     @Test

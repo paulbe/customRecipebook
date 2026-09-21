@@ -36,7 +36,9 @@ data class Recipe(
     val title: String,
     val subtitle: String,
     val category: RecipeCategory,
-    val minutes: Int,
+    val prepMinutes: Int = 0,
+    val cookMinutes: Int = 0,
+    val totalMinutes: Int = 0,
     val baseServings: Int,
     val servingsUnit: String,
     val difficulty: String,
@@ -51,6 +53,8 @@ data class Recipe(
     val ingredients: List<Ingredient> = emptyList(),
     val directions: List<Direction> = emptyList(),
 ) {
+    val minutes: Int get() = effectiveMinutes(prepMinutes, cookMinutes, totalMinutes)
+
     fun yieldLabel(scale: Int = 1): String {
         val amount = baseServings * scale
         return "$amount $servingsUnit"
@@ -61,7 +65,9 @@ data class RecipeDraft(
     val title: String = "",
     val subtitle: String = "",
     val category: RecipeCategory = RecipeCategory.DINNER,
-    val minutes: Int = 30,
+    val prepMinutes: Int = 0,
+    val cookMinutes: Int = 0,
+    val totalMinutes: Int = 0,
     val baseServings: Int = 4,
     val servingsUnit: String = "servings",
     val difficulty: String = "Easy",
@@ -76,13 +82,17 @@ data class RecipeDraft(
     val titleConfidence: Int = 0,
     val ingredientsConfidence: Int = 0,
     val instructionsConfidence: Int = 0,
-)
+) {
+    val minutes: Int get() = effectiveMinutes(prepMinutes, cookMinutes, totalMinutes)
+}
 
 fun Recipe.toDraft(): RecipeDraft = RecipeDraft(
     title = title,
     subtitle = subtitle,
     category = if (category == RecipeCategory.BAKING) RecipeCategory.BAKING else RecipeCategory.DINNER,
-    minutes = minutes,
+    prepMinutes = prepMinutes,
+    cookMinutes = cookMinutes,
+    totalMinutes = totalMinutes,
     baseServings = baseServings,
     servingsUnit = servingsUnit,
     difficulty = difficulty,
@@ -103,6 +113,11 @@ fun Recipe.toDraft(): RecipeDraft = RecipeDraft(
     },
     directions = directions.sortedBy { it.stepNumber }.map { it.text },
 )
+
+fun effectiveMinutes(prepMinutes: Int, cookMinutes: Int, totalMinutes: Int): Int = when {
+    totalMinutes > 0 -> totalMinutes
+    else -> (prepMinutes.coerceAtLeast(0) + cookMinutes.coerceAtLeast(0)).takeIf { it > 0 } ?: 0
+}
 
 data class DraftIngredient(
     val name: String,
