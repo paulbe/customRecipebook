@@ -15,13 +15,16 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -161,11 +164,19 @@ fun ManualRecipeScreen(
                 Text("No ingredients detected yet. Tap Add to enter them.", color = Taupe, fontSize = 13.sp)
             }
             draft.ingredients.forEachIndexed { index, item ->
-                IngredientEditor(item) { updated ->
-                    vm.updateDraft { d ->
-                        d.copy(ingredients = d.ingredients.toMutableList().also { it[index] = updated })
-                    }
-                }
+                IngredientEditor(
+                    item = item,
+                    onChange = { updated ->
+                        vm.updateDraft { d ->
+                            d.copy(ingredients = d.ingredients.toMutableList().also { it[index] = updated })
+                        }
+                    },
+                    onDelete = {
+                        vm.updateDraft { d ->
+                            d.copy(ingredients = d.ingredients.toMutableList().also { it.removeAt(index) })
+                        }
+                    },
+                )
             }
 
             SectionHeader("Directions", count = draft.directions.size) {
@@ -175,9 +186,21 @@ fun ManualRecipeScreen(
                 Text("No steps detected yet. Tap Add to write them.", color = Taupe, fontSize = 13.sp)
             }
             draft.directions.forEachIndexed { index, step ->
-                Field("Step ${index + 1}", step, singleLine = false) { value ->
-                    vm.updateDraft { d ->
-                        d.copy(directions = d.directions.toMutableList().also { it[index] = value })
+                Row(
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Box(Modifier.weight(1f)) {
+                        Field("Step ${index + 1}", step, singleLine = false) { value ->
+                            vm.updateDraft { d ->
+                                d.copy(directions = d.directions.toMutableList().also { it[index] = value })
+                            }
+                        }
+                    }
+                    DeleteControl("Delete step ${index + 1}") {
+                        vm.updateDraft { d ->
+                            d.copy(directions = d.directions.toMutableList().also { it.removeAt(index) })
+                        }
                     }
                 }
             }
@@ -234,7 +257,11 @@ private fun SectionHeader(title: String, count: Int = 0, onAdd: () -> Unit) {
 }
 
 @Composable
-private fun IngredientEditor(item: DraftIngredient, onChange: (DraftIngredient) -> Unit) {
+private fun IngredientEditor(
+    item: DraftIngredient,
+    onChange: (DraftIngredient) -> Unit,
+    onDelete: () -> Unit,
+) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -243,18 +270,26 @@ private fun IngredientEditor(item: DraftIngredient, onChange: (DraftIngredient) 
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(
-            QuantityFormatter.ingredientLine(item, UnitSystem.US),
-            color = Espresso,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-        if (item.quantityMetric > 0.0 || item.unitMetric.isNotBlank()) {
-            Text(
-                QuantityFormatter.ingredientLine(item, UnitSystem.METRIC),
-                color = Taupe,
-                fontSize = 13.sp,
-            )
+        Row(
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    QuantityFormatter.ingredientLine(item, UnitSystem.US),
+                    color = Espresso,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (item.quantityMetric > 0.0 || item.unitMetric.isNotBlank()) {
+                    Text(
+                        QuantityFormatter.ingredientLine(item, UnitSystem.METRIC),
+                        color = Taupe,
+                        fontSize = 13.sp,
+                    )
+                }
+            }
+            DeleteControl("Delete ingredient") { onDelete() }
         }
         Field("Name", item.name, compact = true) { onChange(item.copy(name = it)) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -277,6 +312,21 @@ private fun IngredientEditor(item: DraftIngredient, onChange: (DraftIngredient) 
                 Field("Metric unit", item.unitMetric, compact = true) { onChange(item.copy(unitMetric = it)) }
             }
         }
+    }
+}
+
+@Composable
+private fun DeleteControl(label: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .padding(top = 4.dp)
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(Clay)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(Icons.Outlined.Delete, contentDescription = label, tint = Terracotta)
     }
 }
 
